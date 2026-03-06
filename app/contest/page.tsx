@@ -1,5 +1,7 @@
 'use client'
 
+import Navbar from '../components/navbar'
+
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -11,272 +13,246 @@ type DbGame = {
   status: string | null
 }
 
-const TEAM_NAMES: Record<string, string> = {
-  ANA: 'Anaheim Ducks',
-  BOS: 'Boston Bruins',
-  BUF: 'Buffalo Sabres',
-  CAR: 'Carolina Hurricanes',
-  CBJ: 'Columbus Blue Jackets',
-  CGY: 'Calgary Flames',
-  CHI: 'Chicago Blackhawks',
-  COL: 'Colorado Avalanche',
-  DAL: 'Dallas Stars',
-  DET: 'Detroit Red Wings',
-  EDM: 'Edmonton Oilers',
-  FLA: 'Florida Panthers',
-  LAK: 'Los Angeles Kings',
-  MIN: 'Minnesota Wild',
-  MTL: 'Montreal Canadiens',
-  NJD: 'New Jersey Devils',
-  NSH: 'Nashville Predators',
-  NYI: 'New York Islanders',
-  NYR: 'New York Rangers',
-  OTT: 'Ottawa Senators',
-  PHI: 'Philadelphia Flyers',
-  PIT: 'Pittsburgh Penguins',
-  SEA: 'Seattle Kraken',
-  SJS: 'San Jose Sharks',
-  STL: 'St. Louis Blues',
-  TBL: 'Tampa Bay Lightning',
-  TOR: 'Toronto Maple Leafs',
-  UTA: 'Utah Hockey Club',
-  VAN: 'Vancouver Canucks',
-  VGK: 'Vegas Golden Knights',
-  WPG: 'Winnipeg Jets',
-  WSH: 'Washington Capitals',
-}
-
-function fullTeamName(abbrev: string) {
-  return TEAM_NAMES[abbrev] || abbrev
-}
-
 export default function ContestPage() {
+
   const [names, setNames] = useState<string[]>([])
   const [games, setGames] = useState<DbGame[]>([])
   const [selectedName, setSelectedName] = useState('')
-  const [picks, setPicks] = useState<Record<number, string>>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [message, setMessage] = useState('')
+  const [picks, setPicks] = useState<Record<number,string>>({})
+  const [message,setMessage] = useState('')
+  const [isSubmitting,setIsSubmitting] = useState(false)
 
-  useEffect(() => {
+  useEffect(()=>{
     loadPage()
-  }, [])
+  },[])
 
-  async function loadPage() {
-    await Promise.all([loadNames(), loadGames()])
+  async function loadPage(){
+    await Promise.all([loadNames(),loadGames()])
   }
 
-  async function loadNames() {
-    const { data, error } = await supabase
+  async function loadNames(){
+
+    const {data} = await supabase
       .from('allowed_names')
       .select('name')
       .order('name')
 
-    if (error) {
-      console.error('Error loading names:', error)
-      return
-    }
+    setNames((data || []).map((n:any)=>n.name))
 
-    setNames((data || []).map((row: { name: string }) => row.name))
   }
 
-  async function loadGames() {
-    try {
-      await fetch('/api/generate-slate')
+  async function loadGames(){
 
-      const today = new Date().toISOString().split('T')[0]
+    await fetch('/api/generate-slate')
 
-      const { data: slate, error: slateError } = await supabase
-        .from('slates')
-        .select('id')
-        .eq('slate_date', today)
-        .single()
+    const today = new Date().toISOString().split('T')[0]
 
-      if (slateError || !slate) {
-        console.error('Slate load error:', slateError)
-        setGames([])
-        return
-      }
+    const {data:slate} = await supabase
+      .from('slates')
+      .select('id')
+      .eq('slate_date',today)
+      .single()
 
-      const { data: gameRows, error: gamesError } = await supabase
-        .from('games')
-        .select('id, away_team, home_team, start_time, status')
-        .eq('slate_id', slate.id)
-        .order('start_time', { ascending: true })
+    if(!slate) return
 
-      if (gamesError) {
-        console.error('Games load error:', gamesError)
-        setGames([])
-        return
-      }
+    const {data} = await supabase
+      .from('games')
+      .select('id,away_team,home_team,start_time,status')
+      .eq('slate_id',slate.id)
+      .order('start_time')
 
-      setGames(gameRows || [])
-    } catch (err) {
-      console.error('Load games error:', err)
-      setGames([])
-    }
+    setGames(data || [])
+
   }
 
-  function isLocked(startTime: string) {
-    return new Date(startTime) <= new Date()
+  function isLocked(start:string){
+    return new Date(start) <= new Date()
   }
 
-  function makePick(gameId: number, team: string, locked: boolean) {
-    if (locked) return
+  function makePick(gameId:number,team:string,locked:boolean){
 
-    setPicks((prev) => ({
+    if(locked) return
+
+    setPicks(prev=>({
       ...prev,
-      [gameId]: team,
+      [gameId]:team
     }))
+
   }
 
-  async function submitPicks() {
-    setMessage('')
+  async function submitPicks(){
 
-    if (!selectedName) {
-      setMessage('Please select your name first.')
+    if(!selectedName){
+      setMessage('Select your name first')
       return
     }
 
-    const pickEntries = Object.entries(picks).map(([gameId, pickedTeam]) => ({
-      gameId: Number(gameId),
-      pickedTeam,
+    const pickEntries = Object.entries(picks).map(([gameId,pickedTeam])=>({
+      gameId:Number(gameId),
+      pickedTeam
     }))
 
-    if (pickEntries.length === 0) {
-      setMessage('Please make at least one pick.')
+    if(!pickEntries.length){
+      setMessage('Make at least one pick')
       return
     }
 
     setIsSubmitting(true)
 
-    try {
-      const res = await fetch('/api/save-picks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          entrantName: selectedName,
-          picks: pickEntries,
-        }),
+    const res = await fetch('/api/save-picks',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        entrantName:selectedName,
+        picks:pickEntries
       })
+    })
 
-      const json = await res.json()
+    const json = await res.json()
 
-      if (!res.ok || !json.success) {
-        setMessage(json.error || 'Unable to save picks.')
-      } else {
-        setMessage(`Picks saved. Saved: ${json.savedCount}, Locked skipped: ${json.lockedCount}`)
-      }
-    } catch (err) {
-      console.error(err)
-      setMessage('Something went wrong while saving picks.')
-    } finally {
-      setIsSubmitting(false)
+    if(json.success){
+      setMessage(`Saved ${json.savedCount} picks`)
+    }else{
+      setMessage(json.error || 'Error saving picks')
     }
+
+    setIsSubmitting(false)
+
+  }
+
+  function logo(team:string){
+    return `https://assets.nhle.com/logos/nhl/svg/${team}_dark.svg`
   }
 
   return (
-    <div style={{ padding: 40, fontFamily: 'sans-serif', maxWidth: 900 }}>
+
+    <div style={{
+      padding:40,
+      fontFamily:'sans-serif',
+      maxWidth:900,
+      margin:'auto'
+    }}>
+
       <h1>NHL Pick Contest</h1>
 
-      <div style={{ marginBottom: 30 }}>
-        <label htmlFor="name-select">Select Your Name</label>
-        <br />
-        <br />
+      <div style={{marginBottom:30}}>
+
         <select
-          id="name-select"
           value={selectedName}
-          onChange={(e) => setSelectedName(e.target.value)}
+          onChange={(e)=>setSelectedName(e.target.value)}
         >
-          <option value="">Choose your name</option>
-          {names.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
+
+          <option value="">Select Your Name</option>
+
+          {names.map(name=>(
+            <option key={name}>{name}</option>
           ))}
+
         </select>
+
       </div>
 
-      <h2>Today&apos;s Games</h2>
+      {games.map(game=>{
 
-      {games.length === 0 ? (
-        <p>No games found for today.</p>
-      ) : (
-        games.map((game) => {
-          const locked = isLocked(game.start_time)
+        const locked = isLocked(game.start_time)
 
-          return (
-            <div
-              key={game.id}
-              style={{
-                border: '1px solid #ccc',
-                padding: 14,
-                marginBottom: 14,
-                borderRadius: 10,
-              }}
-            >
-              <div style={{ marginBottom: 6, fontWeight: 700 }}>
-                {fullTeamName(game.away_team)} @ {fullTeamName(game.home_team)}
-              </div>
+        return (
 
-              <div style={{ marginBottom: 12, fontSize: 13, opacity: 0.8 }}>
-                {new Date(game.start_time).toLocaleString()}
-                {locked ? ' • Locked' : ' • Open'}
-              </div>
+          <div
+          key={game.id}
+          style={{
+            border:'1px solid #ddd',
+            borderRadius:12,
+            padding:16,
+            marginBottom:16,
+            background:'#fafafa'
+          }}>
 
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  disabled={locked}
-                  onClick={() => makePick(game.id, game.away_team, locked)}
-                  style={{
-                    padding: '10px 14px',
-                    cursor: locked ? 'not-allowed' : 'pointer',
-                    background: picks[game.id] === game.away_team ? '#4CAF50' : '#eee',
-                    opacity: locked ? 0.6 : 1,
-                  }}
-                >
-                  {fullTeamName(game.away_team)}
-                </button>
-
-                <button
-                  type="button"
-                  disabled={locked}
-                  onClick={() => makePick(game.id, game.home_team, locked)}
-                  style={{
-                    padding: '10px 14px',
-                    cursor: locked ? 'not-allowed' : 'pointer',
-                    background: picks[game.id] === game.home_team ? '#4CAF50' : '#eee',
-                    opacity: locked ? 0.6 : 1,
-                  }}
-                >
-                  {fullTeamName(game.home_team)}
-                </button>
-              </div>
+            <div style={{
+              fontSize:12,
+              opacity:0.7,
+              marginBottom:10
+            }}>
+              {new Date(game.start_time).toLocaleString()}
+              {locked && ' • Locked'}
             </div>
-          )
-        })
-      )}
+
+            <div style={{
+              display:'flex',
+              gap:10
+            }}>
+
+              {[game.away_team,game.home_team].map(team=>{
+
+                const selected =
+                  picks[game.id] === team
+
+                return (
+
+                  <button
+                  key={team}
+                  disabled={locked}
+                  onClick={()=>makePick(game.id,team,locked)}
+                  style={{
+                    flex:1,
+                    display:'flex',
+                    alignItems:'center',
+                    gap:10,
+                    padding:14,
+                    borderRadius:10,
+                    border:selected
+                      ? '2px solid #4CAF50'
+                      : '1px solid #ccc',
+                    background:selected
+                      ? '#e8f5e9'
+                      : 'white',
+                    cursor:locked
+                      ? 'not-allowed'
+                      : 'pointer'
+                  }}>
+
+                    <img
+                    src={logo(team)}
+                    width={28}
+                    height={28}
+                    />
+
+                    <strong>{team}</strong>
+
+                  </button>
+
+                )
+
+              })}
+
+            </div>
+
+          </div>
+
+        )
+
+      })}
 
       <button
-        type="button"
-        onClick={submitPicks}
-        disabled={isSubmitting}
-        style={{
-          marginTop: 20,
-          padding: '12px 24px',
-          fontSize: 16,
-          cursor: isSubmitting ? 'not-allowed' : 'pointer',
-        }}
-      >
+      onClick={submitPicks}
+      disabled={isSubmitting}
+      style={{
+        marginTop:20,
+        padding:'12px 20px',
+        fontSize:16,
+        cursor:'pointer'
+      }}>
         {isSubmitting ? 'Saving...' : 'Submit Picks'}
       </button>
 
       {message && (
-        <p style={{ marginTop: 16, fontWeight: 600 }}>
+        <div style={{marginTop:16,fontWeight:600}}>
           {message}
-        </p>
+        </div>
       )}
+
     </div>
+
   )
+
 }
