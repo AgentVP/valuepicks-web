@@ -3,112 +3,95 @@
 import { useEffect, useState } from 'react'
 
 type Game = {
-  id:number
-  awayTeam:{abbrev:string, score?:number}
-  homeTeam:{abbrev:string, score?:number}
-  gameState:string
-  periodDescriptor?:{number:number}
-  clock?:{timeRemaining:string}
+  id: number
+  awayTeam: { abbrev: string; score?: number }
+  homeTeam: { abbrev: string; score?: number }
+  gameState: string
+  periodDescriptor?: { number: number; periodType?: string }
+  clock?: { timeRemaining: string }
 }
 
-export default function Scoreboard(){
+function logo(team: string) {
+  return `https://assets.nhle.com/logos/nhl/svg/${team}_dark.svg`
+}
 
-  const [games,setGames] = useState<Game[]>([])
+export default function Scoreboard() {
+  const [games, setGames] = useState<Game[]>([])
 
-  useEffect(()=>{
-
+  useEffect(() => {
     loadGames()
+    const interval = setInterval(loadGames, 20000)
+    return () => clearInterval(interval)
+  }, [])
 
-    const interval = setInterval(()=>{
-      loadGames()
-    },20000)
-
-    return ()=>clearInterval(interval)
-
-  },[])
-
-  async function loadGames(){
-
+  async function loadGames() {
     const today = new Date().toISOString().split('T')[0]
-
-    const res = await fetch(
-      `https://api-web.nhle.com/v1/schedule/${today}`
-    )
-
-    const json = await res.json()
-
-    const games =
-      json.gameWeek
-        ?.filter((d:any)=>d.date===today)
-        .flatMap((d:any)=>d.games) || []
-
-    setGames(games)
-
+    try {
+      const res = await fetch(`/api/schedule?date=${today}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const json = await res.json()
+      const list =
+        json.gameWeek
+          ?.filter((d: { date: string }) => d.date === today)
+          ?.flatMap((d: { games?: Game[] }) => d.games || []) || []
+      setGames(list)
+    } catch (_) {
+      setGames([])
+    }
   }
 
-  return(
+  if (games.length === 0) return null
 
-    <div
-      style={{
-        background:'#111',
-        color:'white',
-        padding:'10px 20px',
-        overflowX:'auto'
-      }}
-    >
-
-      <div style={{
-        display:'flex',
-        gap:24,
-        alignItems:'center'
-      }}>
-
-        <strong>🏒 Tonight</strong>
-
-        {games.map(g=>{
-
-          const period =
-            g.periodDescriptor?.number
-
-          const clock =
-            g.clock?.timeRemaining
-
-          return(
-
+  return (
+    <div className="border-t border-[var(--card-border)] bg-black/30 overflow-x-auto">
+      <div className="flex items-center gap-8 px-4 py-3 min-w-max">
+        <span className="text-sm font-semibold text-[var(--ice)]/90 uppercase tracking-wider shrink-0">
+          Live
+        </span>
+        {games.map((g) => {
+          const isLive = g.gameState === 'LIVE'
+          const isFinal = g.gameState === 'FINAL' || g.gameState === 'OFF'
+          const showScore = isLive || isFinal
+          const period = g.periodDescriptor?.number
+          const clock = g.clock?.timeRemaining
+          return (
             <div
               key={g.id}
-              style={{
-                whiteSpace:'nowrap',
-                fontSize:14
-              }}
+              className="flex items-center gap-1.5 shrink-0"
             >
-
-              {g.awayTeam.abbrev}
-              {' '}
-              {g.awayTeam.score ?? '-'}
-              {'  '}
-              {g.homeTeam.abbrev}
-              {' '}
-              {g.homeTeam.score ?? '-'}
-
-              {'  '}
-
-              {g.gameState === 'LIVE' && period
-                ? `(${period} • ${clock})`
-                : g.gameState === 'FINAL'
-                ? '(Final)'
-                : ''}
-
+              <img
+                src={logo(g.awayTeam.abbrev)}
+                alt=""
+                width={26}
+                height={26}
+                className="opacity-90 shrink-0"
+              />
+              {showScore && g.awayTeam.score != null ? (
+                <span className="text-base font-semibold text-white w-6 text-right tabular-nums">{g.awayTeam.score}</span>
+              ) : null}
+              <span className="text-[var(--ice)]/50 text-sm shrink-0">@</span>
+              <img
+                src={logo(g.homeTeam.abbrev)}
+                alt=""
+                width={26}
+                height={26}
+                className="opacity-90 shrink-0"
+              />
+              {showScore && g.homeTeam.score != null ? (
+                <span className="text-base font-semibold text-white w-6 tabular-nums">{g.homeTeam.score}</span>
+              ) : null}
+              {isLive && period && (
+                <span className="text-sm text-[var(--live)] font-medium live-pulse min-w-[3rem]">
+                  {period}P {clock ?? ''}
+                </span>
+              )}
+              {isFinal && (
+                <span className="text-sm text-[var(--ice)]/60">Final</span>
+              )}
             </div>
-
           )
-
         })}
-
       </div>
-
     </div>
-
   )
-
 }

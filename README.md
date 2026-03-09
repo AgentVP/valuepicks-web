@@ -1,5 +1,33 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## ValuePicks NHL Contest
+
+Daily NHL pick contest among friends. Submit picks, optional odds for tiebreaker (higher parlay odds win ties). Live scores on Today page.
+
+### Optional: show odds on Contest page
+
+Odds are for reference and used as the tiebreaker. To display them (single source, free):
+
+1. Sign up at [The Odds API](https://the-odds-api.com/) (free tier: 500 requests/month).
+2. Add to `.env.local`: `ODDS_API_KEY=your_key_here`
+3. Restart the dev server. The Contest page will show moneyline odds next to each team and use them when you submit picks.
+
+If you don’t set the key, the Contest page still works; odds just won’t be shown.
+
+Odds are cached in the database once per day so the API is only called once per day (optional table: see `docs/RUN-MIGRATION.md`).
+
+### Database migration (tiebreaker odds)
+
+To enable the parlay-odds tiebreaker, add the `decimal_odds` column to `picks`:
+
+```bash
+# If using Supabase CLI:
+supabase db push
+
+# Or run in SQL Editor in Supabase dashboard:
+# See supabase/migrations/20250309000000_add_picks_odds.sql
+```
+
 ## Getting Started
 
 First, run the development server:

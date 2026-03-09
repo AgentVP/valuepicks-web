@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const entrantName: string = body.entrantName
-    const picks: Array<{ gameId: number; pickedTeam: string }> = body.picks || []
+    const picks: Array<{ gameId: number; pickedTeam: string; decimalOdds?: number | null }> = body.picks || []
 
     if (!entrantName) {
       return Response.json({ success: false, error: 'entrantName is required' }, { status: 400 })
@@ -92,6 +92,9 @@ export async function POST(req: Request) {
         continue
       }
 
+      const decimalOdds =
+        pick.decimalOdds != null && pick.decimalOdds > 0 ? pick.decimalOdds : null
+
       const { error: pickError } = await supabase
         .from('picks')
         .upsert(
@@ -99,6 +102,7 @@ export async function POST(req: Request) {
             entry_id: entry.id,
             game_id: pick.gameId,
             picked_team: pick.pickedTeam,
+            ...(decimalOdds != null && { decimal_odds: decimalOdds }),
           },
           {
             onConflict: 'entry_id,game_id',
