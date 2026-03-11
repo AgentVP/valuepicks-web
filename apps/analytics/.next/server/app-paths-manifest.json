@@ -1,0 +1,12 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/analytics/data/route": "app/api/analytics/data/route.js",
+  "/api/analytics/upload/route": "app/api/analytics/upload/route.js",
+  "/login/page": "app/login/page.js",
+  "/moneyline/page": "app/moneyline/page.js",
+  "/ou/page": "app/ou/page.js",
+  "/page": "app/page.js",
+  "/save-bets/page": "app/save-bets/page.js",
+  "/shot-bets/page": "app/shot-bets/page.js"
+}

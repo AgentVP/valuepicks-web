@@ -87,18 +87,18 @@ export default function TodayPage() {
     const rawList: Game[] = gameRows || []
     const byCanonical = new Map<string, Game>()
     for (const g of rawList) {
-      const key = `${teamToCanonicalAbbrev(g.away_team)}_${teamToCanonicalAbbrev(g.home_team)}`
-      const existing = byCanonical.get(key)
       const gAwayCanon = teamToCanonicalAbbrev(g.away_team)
       const gHomeCanon = teamToCanonicalAbbrev(g.home_team)
+      const key = `${gAwayCanon}_${gHomeCanon}`
+      const existing = byCanonical.get(key)
       const gIsCanonical = g.away_team === gAwayCanon && g.home_team === gHomeCanon
+      const normalized = { ...g, away_team: gAwayCanon, home_team: gHomeCanon }
       if (!existing) {
-        byCanonical.set(key, g)
+        byCanonical.set(key, normalized)
       } else {
-        const exAwayCanon = teamToCanonicalAbbrev(existing.away_team)
-        const exHomeCanon = teamToCanonicalAbbrev(existing.home_team)
-        const exIsCanonical = existing.away_team === exAwayCanon && existing.home_team === exHomeCanon
-        if (gIsCanonical && !exIsCanonical) byCanonical.set(key, g)
+        const exIsCanonical = existing.away_team === teamToCanonicalAbbrev(existing.away_team) && existing.home_team === teamToCanonicalAbbrev(existing.home_team)
+        if (gIsCanonical && !exIsCanonical) byCanonical.set(key, normalized)
+        else if (!existing.nhl_game_id && g.nhl_game_id) byCanonical.set(key, normalized)
       }
     }
     let gamesList = Array.from(byCanonical.values()).sort(

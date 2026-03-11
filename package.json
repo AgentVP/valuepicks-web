@@ -2,11 +2,18 @@
   "name": "valuepicks-web",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:analytics": "npm --workspace valuepicks-analytics run dev",
+    "build:analytics": "npm --workspace valuepicks-analytics run build",
+    "start:analytics": "npm --workspace valuepicks-analytics run start",
+    "lint:analytics": "npm --workspace valuepicks-analytics run lint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",

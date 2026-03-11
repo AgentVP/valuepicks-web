@@ -1,16 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getLocalDateString } from '@/lib/dateUtils'
+import { getLocalDateString, getYesterdayContestDate } from '@/lib/dateUtils'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
 type Game = {
   id: number
+  nhl_game_id?: number | null
   away_team: string
   home_team: string
   start_time: string
   away_score: number | null
   home_score: number | null
+  alternateGameIds?: number[]
 }
 
 type PickGame = {
@@ -78,6 +80,7 @@ export default function LeaderboardPage() {
   const [entries, setEntries] = useState<Entry[]>([])
   const [games, setGames] = useState<Game[]>([])
   const [potInfo, setPotInfo] = useState<{ entryCount: number; pot: number; perWinner: number } | null>(null)
+  const [slateDate, setSlateDate] = useState<string | null>(null)
 
   useEffect(() => {
     loadBoard()
@@ -97,28 +100,39 @@ export default function LeaderboardPage() {
     const today = getLocalDateString()
 
     try {
-      const res = await fetch(`/api/leaderboard?date=${encodeURIComponent(today)}`, { cache: 'no-store' })
+      let res = await fetch(`/api/leaderboard?date=${encodeURIComponent(today)}`, { cache: 'no-store' })
       if (!res.ok) throw new Error(`Leaderboard API error ${res.status}`)
-      const json = await res.json()
-      const rawGames: Game[] = json.games || []
-      const rawEntries: Entry[] = json.entries || []
-      const rawPot = json.potInfo ?? null
+      let json = await res.json()
+      let rawGames: Game[] = json.games || []
+      let rawEntries: Entry[] = json.entries || []
+      let rawPot = json.potInfo ?? null
+      let effectiveDate = today
 
-      // Keep the same dedupe behavior as the old client-side query.
+      if (rawEntries.length === 0 && rawGames.length === 0) {
+        const yesterday = getYesterdayContestDate()
+        res = await fetch(`/api/leaderboard?date=${encodeURIComponent(yesterday)}`, { cache: 'no-store' })
+        if (res.ok) {
+          json = await res.json()
+          rawGames = json.games || []
+          rawEntries = json.entries || []
+          rawPot = json.potInfo ?? null
+          effectiveDate = yesterday
+        }
+      }
+
       const byCanonical = new Map<string, Game>()
       for (const g of rawGames) {
-        const key = `${teamToCanonicalAbbrev(g.away_team)}_${teamToCanonicalAbbrev(g.home_team)}`
+        const awayCanon = teamToCanonicalAbbrev(g.away_team)
+        const homeCanon = teamToCanonicalAbbrev(g.home_team)
+        const key = `${awayCanon}_${homeCanon}`
         const existing = byCanonical.get(key)
-        const gIsCanonical =
-          g.away_team === teamToCanonicalAbbrev(g.away_team) &&
-          g.home_team === teamToCanonicalAbbrev(g.home_team)
+        const normalized = { ...g, away_team: awayCanon, home_team: homeCanon }
         if (!existing) {
-          byCanonical.set(key, g)
+          byCanonical.set(key, normalized)
         } else {
-          const exIsCanonical =
-            existing.away_team === teamToCanonicalAbbrev(existing.away_team) &&
-            existing.home_team === teamToCanonicalAbbrev(existing.home_team)
-          if (gIsCanonical && !exIsCanonical) byCanonical.set(key, g)
+          const exIsCanonical = existing.away_team === teamToCanonicalAbbrev(existing.away_team) && existing.home_team === teamToCanonicalAbbrev(existing.home_team)
+          if (g.away_team === awayCanon && g.home_team === homeCanon && !exIsCanonical) byCanonical.set(key, normalized)
+          else if (!existing.nhl_game_id && g.nhl_game_id) byCanonical.set(key, normalized)
         }
       }
       const deduped = Array.from(byCanonical.values()).sort(
@@ -128,11 +142,13 @@ export default function LeaderboardPage() {
       setGames(deduped)
       setEntries(rawEntries)
       setPotInfo(rawPot)
+      setSlateDate(effectiveDate)
     } catch (e) {
       console.error(e)
       setGames([])
       setEntries([])
       setPotInfo(null)
+      setSlateDate(null)
     }
   }
 
@@ -170,8 +186,10 @@ export default function LeaderboardPage() {
       : lossLive
   }
 
-  function pickForGame(entry: Entry, gameId: number) {
-    return entry.picks.find((p) => p.game_id === gameId)
+  function pickForGame(entry: Entry, game: Game) {
+    return entry.picks.find(
+      (p) => p.game_id === game.id || game.alternateGameIds?.includes(p.game_id)
+    )
   }
 
   function pickLiveStatus(p: Pick): 'winning' | 'losing' | 'tied' | null {
@@ -183,9 +201,16 @@ export default function LeaderboardPage() {
     return p.picked_team === leading ? 'winning' : 'losing'
   }
 
+  const isToday = slateDate === getLocalDateString()
+
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold text-white mb-2">Leaderboard</h1>
+      {slateDate && !isToday && (
+        <p className="text-[var(--accent)]/90 text-sm font-medium mb-2">
+          Showing results for {slateDate}
+        </p>
+      )}
       <p className="text-[var(--ice)]/70 text-sm mb-2">
         Ties broken by parlay odds (higher = better). Add odds when you submit picks to use the tiebreaker.
       </p>
@@ -270,7 +295,7 @@ export default function LeaderboardPage() {
             </div>
             <div className="flex flex-wrap gap-1.5">
               {games.map((game) => {
-                const pick = pickForGame(entry, game.id)
+                const pick = pickForGame(entry, game)
                 if (!pick) {
                   return (
                     <div

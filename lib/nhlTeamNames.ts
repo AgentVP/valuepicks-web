@@ -46,6 +46,18 @@ export const ODDS_API_NAME_TO_ABBREV: Record<string, string> = {
 const DISPLAY_TO_ABBREV: Record<string, string> = {
   Mammoth: 'UTA',
   Wild: 'MIN',
+  'Golden Knights': 'VGK',
+  Stars: 'DAL',
+  Ducks: 'ANA',
+  Jets: 'WPG',
+  Avalanche: 'COL',
+  Kraken: 'SEA',
+  Predators: 'NSH',
+  Oilers: 'EDM',
+  Senators: 'OTT',
+  Canadiens: 'MTL',
+  Capitals: 'WSH',
+  Flyers: 'PHI',
   ...ODDS_API_NAME_TO_ABBREV,
 }
 

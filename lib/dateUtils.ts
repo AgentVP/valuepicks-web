@@ -19,3 +19,10 @@ export function getContestDateString(d: Date = new Date()): string {
 export function getLocalDateString(): string {
   return getContestDateString()
 }
+
+/** Yesterday's contest date (YYYY-MM-DD) in CONTEST_TIME_ZONE. */
+export function getYesterdayContestDate(): string {
+  const d = new Date()
+  const yesterday = new Date(d.getTime() - 24 * 60 * 60 * 1000)
+  return getContestDateString(yesterday)
+}

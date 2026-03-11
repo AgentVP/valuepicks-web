@@ -72,18 +72,19 @@ export default function ContestPage() {
       .order('start_time')
     const byCanonical = new Map<string, DbGame>()
     for (const g of raw || []) {
-      const key = `${teamToCanonicalAbbrev(g.away_team)}_${teamToCanonicalAbbrev(g.home_team)}`
+      const awayCanon = teamToCanonicalAbbrev(g.away_team)
+      const homeCanon = teamToCanonicalAbbrev(g.home_team)
+      const key = `${awayCanon}_${homeCanon}`
       const existing = byCanonical.get(key)
-      const gIsCanonical =
-        g.away_team === teamToCanonicalAbbrev(g.away_team) &&
-        g.home_team === teamToCanonicalAbbrev(g.home_team)
+      const gIsCanonical = g.away_team === awayCanon && g.home_team === homeCanon
+      const normalized = { ...g, away_team: awayCanon, home_team: homeCanon }
       if (!existing) {
-        byCanonical.set(key, g)
+        byCanonical.set(key, normalized)
       } else {
         const exIsCanonical =
           existing.away_team === teamToCanonicalAbbrev(existing.away_team) &&
           existing.home_team === teamToCanonicalAbbrev(existing.home_team)
-        if (gIsCanonical && !exIsCanonical) byCanonical.set(key, g)
+        if (gIsCanonical && !exIsCanonical) byCanonical.set(key, normalized)
       }
     }
     const data = Array.from(byCanonical.values()).sort(

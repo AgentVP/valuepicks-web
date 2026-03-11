@@ -71,7 +71,33 @@ export async function GET(req: Request) {
       return Response.json({ games: [], entries: [], potInfo: null }, { status: 500 })
     }
 
-    const games: Game[] = (gameRows as Game[]) || []
+    const rawGames: Game[] = (gameRows as Game[]) || []
+    const byCanonical = new Map<string, { game: Game; alternateIds: number[] }>()
+    for (const g of rawGames) {
+      const awayCanon = teamToCanonicalAbbrev(g.away_team)
+      const homeCanon = teamToCanonicalAbbrev(g.home_team)
+      const key = `${awayCanon}_${homeCanon}`
+      const normalized = { ...g, away_team: awayCanon, home_team: homeCanon }
+      const existing = byCanonical.get(key)
+      if (!existing) {
+        byCanonical.set(key, { game: normalized, alternateIds: [] })
+      } else {
+        const replace =
+          (g.nhl_game_id != null && existing.game.nhl_game_id == null) ||
+          (g.away_team === awayCanon && g.home_team === homeCanon && teamToCanonicalAbbrev(existing.game.away_team) !== existing.game.away_team)
+        if (replace) {
+          byCanonical.set(key, {
+            game: normalized,
+            alternateIds: [existing.game.id, ...existing.alternateIds],
+          })
+        } else {
+          existing.alternateIds.push(g.id)
+        }
+      }
+    }
+    const games: (Game & { alternateGameIds?: number[] })[] = Array.from(byCanonical.values())
+      .map(({ game, alternateIds }) => ({ ...game, alternateGameIds: alternateIds }))
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
     // Pull live/final results from NHL schedule (same source as Today page).
     type NhlGame = {
