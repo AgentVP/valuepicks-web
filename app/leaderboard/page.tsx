@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { getLocalDateString } from '@/lib/dateUtils'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
@@ -33,6 +32,7 @@ type Pick = {
 type Entry = {
   entrant_name: string
   picks: Pick[]
+  computed?: { wins: number; losses: number; parlay: number | null }
 }
 
 const ENTRY_FEE = 5
@@ -94,104 +94,43 @@ export default function LeaderboardPage() {
   async function loadBoard() {
     const today = getLocalDateString()
 
-    const { data: slateRows, error: slateError } = await supabase
-      .from('slates')
-      .select('id')
-      .eq('slate_date', today)
-      .order('id', { ascending: false })
-      .limit(1)
+    try {
+      const res = await fetch(`/api/leaderboard?date=${encodeURIComponent(today)}`, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`Leaderboard API error ${res.status}`)
+      const json = await res.json()
+      const rawGames: Game[] = json.games || []
+      const rawEntries: Entry[] = json.entries || []
+      const rawPot = json.potInfo ?? null
 
-    const slate = slateError ? null : slateRows?.[0] ?? null
-    if (!slate) {
+      // Keep the same dedupe behavior as the old client-side query.
+      const byCanonical = new Map<string, Game>()
+      for (const g of rawGames) {
+        const key = `${teamToCanonicalAbbrev(g.away_team)}_${teamToCanonicalAbbrev(g.home_team)}`
+        const existing = byCanonical.get(key)
+        const gIsCanonical =
+          g.away_team === teamToCanonicalAbbrev(g.away_team) &&
+          g.home_team === teamToCanonicalAbbrev(g.home_team)
+        if (!existing) {
+          byCanonical.set(key, g)
+        } else {
+          const exIsCanonical =
+            existing.away_team === teamToCanonicalAbbrev(existing.away_team) &&
+            existing.home_team === teamToCanonicalAbbrev(existing.home_team)
+          if (gIsCanonical && !exIsCanonical) byCanonical.set(key, g)
+        }
+      }
+      const deduped = Array.from(byCanonical.values()).sort(
+        (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+      )
+
+      setGames(deduped)
+      setEntries(rawEntries)
+      setPotInfo(rawPot)
+    } catch (e) {
+      console.error(e)
       setGames([])
       setEntries([])
       setPotInfo(null)
-      return
-    }
-
-    const { data: gameRows, error: gamesError } = await supabase
-      .from('games')
-      .select('id, away_team, home_team, start_time, away_score, home_score')
-      .eq('slate_id', slate.id)
-      .order('start_time', { ascending: true })
-
-    if (gamesError) {
-      console.error(gamesError)
-      setGames([])
-      return
-    }
-    const raw = gameRows || []
-    const byCanonical = new Map<string, Game>()
-    for (const g of raw) {
-      const key = `${teamToCanonicalAbbrev(g.away_team)}_${teamToCanonicalAbbrev(g.home_team)}`
-      const existing = byCanonical.get(key)
-      const gIsCanonical =
-        g.away_team === teamToCanonicalAbbrev(g.away_team) &&
-        g.home_team === teamToCanonicalAbbrev(g.home_team)
-      if (!existing) {
-        byCanonical.set(key, g)
-      } else {
-        const exIsCanonical =
-          existing.away_team === teamToCanonicalAbbrev(existing.away_team) &&
-          existing.home_team === teamToCanonicalAbbrev(existing.home_team)
-        if (gIsCanonical && !exIsCanonical) byCanonical.set(key, g)
-      }
-    }
-    const deduped = Array.from(byCanonical.values()).sort(
-      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    )
-    setGames(deduped)
-
-    const { data: entryRows, error: entriesError } = await supabase
-      .from('entries')
-      .select(`
-        entrant_name,
-        picks (
-          game_id,
-          picked_team,
-          result,
-          decimal_odds,
-          games (
-            away_team,
-            home_team,
-            away_score,
-            home_score,
-            winner_team
-          )
-        )
-      `)
-      .eq('slate_id', slate.id)
-
-    if (entriesError) {
-      console.error(entriesError)
-      return
-    }
-
-    const list = (entryRows as Entry[]) || []
-    const wins = (p: Pick[]) => p.filter((x) => computedResult(x) === true).length
-    const parlay = (e: Entry) => parlayMultiplier(e.picks) ?? 0
-    list.sort((a, b) => {
-      const wa = wins(a.picks)
-      const wb = wins(b.picks)
-      if (wb !== wa) return wb - wa
-      return parlay(b) - parlay(a)
-    })
-    setEntries(list)
-
-    // Compute today's pot and winner payout assuming fixed entry fee
-    const entryCount = list.length
-    if (entryCount === 0) {
-      setPotInfo(null)
-    } else {
-      const maxWins = Math.max(...list.map((e) => wins(e.picks)))
-      const top = list.filter((e) => wins(e.picks) === maxWins)
-      const maxParlay = Math.max(...top.map((e) => parlayMultiplier(e.picks) ?? 0))
-      const winners = list.filter(
-        (e) => wins(e.picks) === maxWins && (parlayMultiplier(e.picks) ?? 0) === maxParlay,
-      )
-      const pot = entryCount * ENTRY_FEE
-      const perWinner = winners.length > 0 ? pot / winners.length : 0
-      setPotInfo({ entryCount, pot, perWinner })
     }
   }
 
