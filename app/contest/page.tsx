@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { getLocalDateString } from '@/lib/dateUtils'
+import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
 type DbGame = {
   id: number
@@ -22,6 +24,8 @@ function formatAmerican(american: number): string {
   if (american >= 0) return `+${american}`
   return `${american}`
 }
+
+const ENTRY_FEE = 5
 
 export default function ContestPage() {
   const [names, setNames] = useState<string[]>([])
@@ -51,20 +55,41 @@ export default function ContestPage() {
   }
 
   async function loadGames() {
-    await fetch('/api/generate-slate')
-    const today = new Date().toISOString().split('T')[0]
-    const { data: slate } = await supabase
+    const today = getLocalDateString()
+    await fetch(`/api/generate-slate?date=${today}`)
+    const { data: slateRows } = await supabase
       .from('slates')
       .select('id')
       .eq('slate_date', today)
-      .single()
+      .order('id', { ascending: false })
+      .limit(1)
+    const slate = slateRows?.[0] ?? null
     if (!slate) return
-    const { data } = await supabase
+    const { data: raw } = await supabase
       .from('games')
       .select('id, away_team, home_team, start_time, status')
       .eq('slate_id', slate.id)
       .order('start_time')
-    setGames(data || [])
+    const byCanonical = new Map<string, DbGame>()
+    for (const g of raw || []) {
+      const key = `${teamToCanonicalAbbrev(g.away_team)}_${teamToCanonicalAbbrev(g.home_team)}`
+      const existing = byCanonical.get(key)
+      const gIsCanonical =
+        g.away_team === teamToCanonicalAbbrev(g.away_team) &&
+        g.home_team === teamToCanonicalAbbrev(g.home_team)
+      if (!existing) {
+        byCanonical.set(key, g)
+      } else {
+        const exIsCanonical =
+          existing.away_team === teamToCanonicalAbbrev(existing.away_team) &&
+          existing.home_team === teamToCanonicalAbbrev(existing.home_team)
+        if (gIsCanonical && !exIsCanonical) byCanonical.set(key, g)
+      }
+    }
+    const data = Array.from(byCanonical.values()).sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    )
+    setGames(data)
   }
 
   async function loadOdds() {
@@ -147,14 +172,18 @@ export default function ContestPage() {
   }
 
   function logo(team: string) {
-    return `https://assets.nhle.com/logos/nhl/svg/${team}_dark.svg`
+    const abbrev = teamToCanonicalAbbrev(team)
+    return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_dark.svg`
   }
 
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold text-white mb-2">NHL Pick Contest</h1>
-      <p className="text-[var(--ice)]/70 text-sm mb-8">
+      <p className="text-[var(--ice)]/70 text-sm mb-2">
         Pick the winner of each game. Odds are for reference and used as the tiebreaker—higher parlay odds win ties.
+      </p>
+      <p className="text-[var(--ice)]/90 text-sm font-medium mb-8">
+        Entry fee: <span className="text-white font-semibold">${ENTRY_FEE.toFixed(2)}</span>
       </p>
 
       <div className="mb-8 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">

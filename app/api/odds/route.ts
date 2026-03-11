@@ -60,11 +60,138 @@ function getOddsApiKey(): string | undefined {
   return undefined
 }
 
+function oddsKey(o: GameOdds): string {
+  return `${o.away_team}_${o.home_team}`
+}
+
 export async function GET() {
   const apiKey = getOddsApiKey()
   const today = new Date().toISOString().split('T')[0]
 
   const supabase = getSupabase()
+  let odds: GameOdds[] = []
+  let source = ''
+
+  // 1) Prefer sportsbook_lines for today's slate; fill any missing games from cache/API.
+  if (supabase) {
+    try {
+      const { data: slate, error: slateError } = await supabase
+        .from('slates')
+        .select('id')
+        .eq('slate_date', today)
+        .maybeSingle()
+
+      if (!slateError && slate) {
+        const { data: games, error: gamesError } = await supabase
+          .from('games')
+          .select('id, away_team, home_team')
+          .eq('slate_id', slate.id)
+
+        if (!gamesError && games && games.length > 0) {
+          const gameIds = games.map((g) => String(g.id))
+          const { data: lines, error: linesError } = await supabase
+            .from('sportsbook_lines')
+            .select('game_id, team, odds, captured_at, market')
+            .in('game_id', gameIds)
+            .eq('market', 'moneyline')
+            .order('captured_at', { ascending: false })
+
+          if (!linesError && lines && lines.length > 0) {
+            const byGame: Record<string, { away?: number; home?: number }> = {}
+            for (const l of lines) {
+              const gid = String(Number((l as any).game_id))
+              if (!byGame[gid]) byGame[gid] = {}
+              const game = games.find((g) => String(Number(g.id)) === gid)
+              if (!game) continue
+              if (l.team === game.away_team && byGame[gid].away == null) byGame[gid].away = Number(l.odds)
+              if (l.team === game.home_team && byGame[gid].home == null) byGame[gid].home = Number(l.odds)
+            }
+            for (const g of games) {
+              const gid = String(Number(g.id))
+              const got = byGame[gid]
+              if (got?.away != null && got?.home != null) {
+                odds.push({
+                  away_team: g.away_team,
+                  home_team: g.home_team,
+                  away_american: got.away,
+                  home_american: got.home,
+                })
+              }
+            }
+            source = 'Supabase sportsbook_lines'
+          }
+        }
+
+        // 2) Fill missing games from odds_cache or live API so every slate game can show odds (e.g. TOR/MTL).
+        if (games && games.length > 0) {
+          const haveKeys = new Set(odds.map(oddsKey))
+          const missingGames = games.filter((g) => !haveKeys.has(`${g.away_team}_${g.home_team}`))
+          if (missingGames.length > 0) {
+          let fallback: GameOdds[] = []
+          const { data: cached } = await supabase
+            .from('odds_cache')
+            .select('data')
+            .eq('cache_date', today)
+            .maybeSingle()
+          if (cached?.data && Array.isArray(cached.data)) fallback = cached.data as GameOdds[]
+          if (fallback.length === 0 && apiKey) {
+            try {
+              const res = await fetch(
+                `https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds?regions=us&markets=h2h&oddsFormat=american&apiKey=${apiKey}`,
+                { cache: 'no-store' }
+              )
+              if (res.ok) {
+                const events: OddsEvent[] = await res.json()
+                for (const ev of events) {
+                  const abbrevs = mapOddsEventToAbbrevs(ev.away_team, ev.home_team)
+                  if (!abbrevs) continue
+                  const book = ev.bookmakers?.[0]
+                  const market = book?.markets?.find((m) => m.key === 'h2h')
+                  const outcomes = market?.outcomes ?? []
+                  if (outcomes.length < 2) continue
+                  const awayOut = outcomes.find((o) => o.name === ev.away_team)
+                  const homeOut = outcomes.find((o) => o.name === ev.home_team)
+                  if (awayOut != null && homeOut != null) {
+                    fallback.push({
+                      away_team: abbrevs.away,
+                      home_team: abbrevs.home,
+                      away_american: awayOut.price,
+                      home_american: homeOut.price,
+                    })
+                  }
+                }
+                if (fallback.length > 0 && supabase) {
+                  await supabase
+                    .from('odds_cache')
+                    .upsert(
+                      { cache_date: today, data: fallback, updated_at: new Date().toISOString() },
+                      { onConflict: 'cache_date' }
+                    )
+                }
+              }
+            } catch (_) {}
+          }
+          for (const o of fallback) {
+            const key = oddsKey(o)
+            if (haveKeys.has(key)) continue
+            haveKeys.add(key)
+            odds.push(o)
+          }
+          if (source && fallback.length > 0) source = source + ' + fallback'
+          else if (fallback.length > 0) source = 'The Odds API (cached)'
+          }
+        }
+
+        if (odds.length > 0) {
+          return Response.json({ odds, source: source || 'Supabase sportsbook_lines', hasKey: true })
+        }
+      }
+    } catch (e) {
+      console.log('[odds] Failed to read sportsbook_lines', String(e))
+    }
+  }
+
+  // 3) No slate or no games: use cache or live API only.
   if (supabase) {
     const { data: cached, error: cacheError } = await supabase
       .from('odds_cache')
@@ -72,10 +199,9 @@ export async function GET() {
       .eq('cache_date', today)
       .maybeSingle()
 
-    if (!cacheError && cached?.data && Array.isArray(cached.data) && cached.data.length > 0) {
+    if (!cacheError && cached?.data && Array.isArray(cached.data) && (cached.data as GameOdds[]).length > 0) {
       return Response.json({ odds: cached.data, source: 'The Odds API (cached)', hasKey: true })
     }
-    // If cacheError (e.g. table missing), fall through to API
   }
 
   if (!apiKey) {
@@ -96,7 +222,7 @@ export async function GET() {
     }
 
     const events: OddsEvent[] = await res.json()
-    const odds: GameOdds[] = []
+    const out: GameOdds[] = []
 
     for (const ev of events) {
       const abbrevs = mapOddsEventToAbbrevs(ev.away_team, ev.home_team)
@@ -111,7 +237,7 @@ export async function GET() {
       const homeOut = outcomes.find((o) => o.name === ev.home_team)
       if (awayOut == null || homeOut == null) continue
 
-      odds.push({
+      out.push({
         away_team: abbrevs.away,
         home_team: abbrevs.home,
         away_american: awayOut.price,
@@ -119,17 +245,16 @@ export async function GET() {
       })
     }
 
-    if (supabase && odds.length > 0) {
+    if (supabase && out.length > 0) {
       await supabase
         .from('odds_cache')
         .upsert(
-          { cache_date: today, data: odds, updated_at: new Date().toISOString() },
+          { cache_date: today, data: out, updated_at: new Date().toISOString() },
           { onConflict: 'cache_date' }
         )
-      // Ignore upsert error (e.g. table not created yet)
     }
 
-    return Response.json({ odds, source: 'The Odds API', hasKey: true })
+    return Response.json({ odds: out, source: 'The Odds API', hasKey: true })
   } catch (err) {
     console.error(err)
     return Response.json({ odds: [], source: null, hasKey: true, error: 'Network or server error' })

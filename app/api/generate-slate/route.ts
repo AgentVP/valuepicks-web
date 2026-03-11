@@ -5,9 +5,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const url = new URL(request.url)
+    const today =
+      url.searchParams.get('date')?.trim() ||
+      new Date().toISOString().split('T')[0]
 
     let { data: slate } = await supabase
       .from('slates')

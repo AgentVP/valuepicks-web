@@ -1,0 +1,4 @@
+[
+  { "shot_line": 28.5, "l10_delta": -1.2, "ha_delta": -0.5, "l10_bucket": -1, "ha_bucket": -0.5, "bet_type": "under", "result": "win" },
+  { "shot_line": 30, "l10_delta": 0.5, "ha_delta": 1, "l10_bucket": 0.5, "ha_bucket": 1, "bet_type": "over", "result": "loss" }
+]

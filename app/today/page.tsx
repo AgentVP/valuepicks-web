@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { getLocalDateString } from '@/lib/dateUtils'
+import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
 type Game = {
   id: number
@@ -52,14 +54,16 @@ export default function TodayPage() {
   }, [])
 
   async function loadPage() {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString()
 
-    const { data: slate } = await supabase
+    const { data: slateRows } = await supabase
       .from('slates')
       .select('id')
       .eq('slate_date', today)
-      .single()
+      .order('id', { ascending: false })
+      .limit(1)
 
+    const slate = slateRows?.[0] ?? null
     if (!slate) return
 
     const { data: gameRows } = await supabase
@@ -80,7 +84,26 @@ export default function TodayPage() {
       .eq('slate_id', slate.id)
       .order('start_time')
 
-    let gamesList: Game[] = gameRows || []
+    const rawList: Game[] = gameRows || []
+    const byCanonical = new Map<string, Game>()
+    for (const g of rawList) {
+      const key = `${teamToCanonicalAbbrev(g.away_team)}_${teamToCanonicalAbbrev(g.home_team)}`
+      const existing = byCanonical.get(key)
+      const gAwayCanon = teamToCanonicalAbbrev(g.away_team)
+      const gHomeCanon = teamToCanonicalAbbrev(g.home_team)
+      const gIsCanonical = g.away_team === gAwayCanon && g.home_team === gHomeCanon
+      if (!existing) {
+        byCanonical.set(key, g)
+      } else {
+        const exAwayCanon = teamToCanonicalAbbrev(existing.away_team)
+        const exHomeCanon = teamToCanonicalAbbrev(existing.home_team)
+        const exIsCanonical = existing.away_team === exAwayCanon && existing.home_team === exHomeCanon
+        if (gIsCanonical && !exIsCanonical) byCanonical.set(key, g)
+      }
+    }
+    let gamesList = Array.from(byCanonical.values()).sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    )
 
     try {
       const [nhlRes, oddsRes] = await Promise.all([
@@ -178,7 +201,8 @@ export default function TodayPage() {
   }
 
   function logo(team: string) {
-    return `https://assets.nhle.com/logos/nhl/svg/${team}_dark.svg`
+    const abbrev = teamToCanonicalAbbrev(team)
+    return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_dark.svg`
   }
 
   return (

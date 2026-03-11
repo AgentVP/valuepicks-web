@@ -25,9 +25,13 @@ function parlayMultiplier(picks: Pick[]): number | null {
   return Math.round(withOdds.reduce((acc, p) => acc * (p.decimal_odds ?? 1), 1) * 100) / 100
 }
 
+/** American odds only (e.g. +3500). Never decimal "x". */
 function formatParlay(m: number | null): string {
   if (m == null) return '–'
-  return m >= 10 ? `${m.toFixed(1)}x` : `${m.toFixed(2)}x`
+  const american = m >= 2 ? Math.round((m - 1) * 100) : Math.round(-100 / (m - 1))
+  const str = String(Math.abs(american))
+  const withCommas = str.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return american >= 0 ? `+${withCommas}` : `-${withCommas}`
 }
 
 function logo(team: string) {

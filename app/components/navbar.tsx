@@ -53,6 +53,12 @@ export default function Navbar() {
           >
             History
           </Link>
+          <Link
+            href="/analytics"
+            className={`${base} ${pathname === '/analytics' || pathname?.startsWith('/analytics') ? active : inactive}`}
+          >
+            Analytics
+          </Link>
         </nav>
       </div>
       <Scoreboard />
