@@ -27,6 +27,7 @@ type Pick = {
   result: boolean | null
   decimal_odds: number | null
   games: PickGame[]
+  computed_result?: boolean | null
 }
 
 type Entry = {
@@ -85,6 +86,7 @@ export default function LeaderboardPage() {
   }, [])
 
   function computedResult(p: Pick): boolean | null {
+    if (typeof p.computed_result === 'boolean') return p.computed_result
     const g = p.games?.[0]
     const winner = g?.winner_team
     if (!winner) return null
