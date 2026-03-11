@@ -19,6 +19,7 @@ type PickGame = {
   home_team: string
   away_score: number | null
   home_score: number | null
+  winner_team?: string | null
 }
 
 type Pick = {
@@ -83,15 +84,14 @@ export default function LeaderboardPage() {
     return () => clearInterval(interval)
   }, [])
 
-  async function loadBoard() {
-    // Keep Supabase in sync by grading the slate periodically (updates games + pick results).
-    // Without this, production can appear "stuck" because the leaderboard only reads DB state.
-    try {
-      await fetch('/api/grade-slate', { cache: 'no-store' })
-    } catch (_) {
-      // If grading fails (network, etc.), still show whatever DB data we have.
-    }
+  function computedResult(p: Pick): boolean | null {
+    const g = p.games?.[0]
+    const winner = g?.winner_team
+    if (!winner) return null
+    return teamToCanonicalAbbrev(p.picked_team) === teamToCanonicalAbbrev(winner)
+  }
 
+  async function loadBoard() {
     const today = getLocalDateString()
 
     const { data: slateRows, error: slateError } = await supabase
@@ -155,7 +155,8 @@ export default function LeaderboardPage() {
             away_team,
             home_team,
             away_score,
-            home_score
+            home_score,
+            winner_team
           )
         )
       `)
@@ -167,7 +168,7 @@ export default function LeaderboardPage() {
     }
 
     const list = (entryRows as Entry[]) || []
-    const wins = (p: Pick[]) => p.filter((x) => x.result === true).length
+    const wins = (p: Pick[]) => p.filter((x) => computedResult(x) === true).length
     const parlay = (e: Entry) => parlayMultiplier(e.picks) ?? 0
     list.sort((a, b) => {
       const wa = wins(a.picks)
@@ -195,8 +196,8 @@ export default function LeaderboardPage() {
   }
 
   function record(picks: Pick[]) {
-    const w = picks.filter((p) => p.result === true).length
-    const l = picks.filter((p) => p.result === false).length
+    const w = picks.filter((p) => computedResult(p) === true).length
+    const l = picks.filter((p) => computedResult(p) === false).length
     return `${w}-${l}`
   }
 
@@ -209,8 +210,9 @@ export default function LeaderboardPage() {
   function boxStyle(p: Pick): string {
     const g = p.games?.[0]
     if (!g) return 'bg-[var(--card-border)]'
-    if (p.result === true) return 'bg-[var(--win)]'
-    if (p.result === false) return 'bg-[var(--loss)]'
+    const r = computedResult(p)
+    if (r === true) return 'bg-[var(--win)]'
+    if (r === false) return 'bg-[var(--loss)]'
     if (g.away_score === null || g.home_score === null) return 'bg-[var(--card-border)]'
     if (g.away_score === g.home_score) return 'bg-[var(--ice)]/25'
     const leading = g.away_score > g.home_score ? g.away_team : g.home_team
@@ -225,7 +227,7 @@ export default function LeaderboardPage() {
 
   function pickLiveStatus(p: Pick): 'winning' | 'losing' | 'tied' | null {
     const g = p.games?.[0]
-    if (!g || p.result !== null) return null
+    if (!g || g.winner_team) return null
     if (g.away_score == null || g.home_score == null) return null
     if (g.away_score === g.home_score) return 'tied'
     const leading = g.away_score > g.home_score ? g.away_team : g.home_team
@@ -313,8 +315,9 @@ export default function LeaderboardPage() {
                 const liveStatus = pickLiveStatus(pick)
                 const titleParts = [pick.picked_team]
                 if (pick.decimal_odds != null) titleParts.push(`(${formatSinglePickAmerican(pick.decimal_odds)})`)
-                if (pick.result === true) titleParts.push('· Won')
-                if (pick.result === false) titleParts.push('· Lost')
+                const r = computedResult(pick)
+                if (r === true) titleParts.push('· Won')
+                if (r === false) titleParts.push('· Lost')
                 if (liveStatus === 'winning') titleParts.push('· Currently winning')
                 if (liveStatus === 'losing') titleParts.push('· Currently losing')
                 if (liveStatus === 'tied') titleParts.push('· Tied')
