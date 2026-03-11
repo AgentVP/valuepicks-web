@@ -150,16 +150,23 @@ export default function LeaderboardPage() {
   /** Thumbnail style: light green when pick is winning live, light red when losing; full green/red when game final. */
   function boxStyle(p: Pick): string {
     const g = p.games?.[0]
-    if (!g) return 'bg-[var(--card-border)] ring-1 ring-white/10'
+    // Use ring + ring-offset so the highlight is visible at 32px.
+    const neutral = 'bg-[var(--card-border)] ring-1 ring-inset ring-white/10'
+    const winFinal = 'bg-[var(--win)]/25 ring-2 ring-inset ring-[var(--win)] ring-offset-2 ring-offset-[var(--card)]'
+    const lossFinal = 'bg-[var(--loss)]/25 ring-2 ring-inset ring-[var(--loss)] ring-offset-2 ring-offset-[var(--card)]'
+    const winLive = 'bg-[var(--win)]/15 ring-2 ring-inset ring-[var(--win)]/70 ring-offset-2 ring-offset-[var(--card)]'
+    const lossLive = 'bg-[var(--loss)]/15 ring-2 ring-inset ring-[var(--loss)]/70 ring-offset-2 ring-offset-[var(--card)]'
+
+    if (!g) return neutral
     const r = computedResult(p)
-    if (r === true) return 'bg-[var(--win)]/25 ring-2 ring-[var(--win)]'
-    if (r === false) return 'bg-[var(--loss)]/25 ring-2 ring-[var(--loss)]'
-    if (g.away_score === null || g.home_score === null) return 'bg-[var(--card-border)] ring-1 ring-white/10'
-    if (g.away_score === g.home_score) return 'bg-[var(--ice)]/25 ring-1 ring-white/10'
+    if (r === true) return winFinal
+    if (r === false) return lossFinal
+    if (g.away_score === null || g.home_score === null) return neutral
+    if (g.away_score === g.home_score) return 'bg-[var(--ice)]/25 ring-1 ring-inset ring-white/10'
     const leading = g.away_score > g.home_score ? g.away_team : g.home_team
     return p.picked_team === leading
-      ? 'bg-[var(--win)]/15 ring-2 ring-[var(--win)]/60'
-      : 'bg-[var(--loss)]/15 ring-2 ring-[var(--loss)]/60'
+      ? winLive
+      : lossLive
   }
 
   function pickForGame(entry: Entry, gameId: number) {
