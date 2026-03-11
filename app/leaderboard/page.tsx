@@ -84,6 +84,14 @@ export default function LeaderboardPage() {
   }, [])
 
   async function loadBoard() {
+    // Keep Supabase in sync by grading the slate periodically (updates games + pick results).
+    // Without this, production can appear "stuck" because the leaderboard only reads DB state.
+    try {
+      await fetch('/api/grade-slate', { cache: 'no-store' })
+    } catch (_) {
+      // If grading fails (network, etc.), still show whatever DB data we have.
+    }
+
     const today = getLocalDateString()
 
     const { data: slateRows, error: slateError } = await supabase
