@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { mapOddsEventToAbbrevs } from '@/lib/nhlTeamNames'
+import { getLocalDateString } from '@/lib/dateUtils'
 
 const __dirname = typeof fileURLToPath !== 'undefined' ? dirname(fileURLToPath(import.meta.url)) : ''
 
@@ -66,7 +67,7 @@ function oddsKey(o: GameOdds): string {
 
 export async function GET() {
   const apiKey = getOddsApiKey()
-  const today = new Date().toISOString().split('T')[0]
+  const today = getLocalDateString()
 
   const supabase = getSupabase()
   let odds: GameOdds[] = []

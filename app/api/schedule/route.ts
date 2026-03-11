@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { getLocalDateString } from '@/lib/dateUtils'
 
 /**
  * Server-side proxy for NHL schedule. The NHL API can block or fail
@@ -6,7 +7,7 @@ import { NextRequest } from 'next/server'
  * the server avoids that.
  */
 export async function GET(req: NextRequest) {
-  const date = req.nextUrl.searchParams.get('date') ?? new Date().toISOString().split('T')[0]
+  const date = req.nextUrl.searchParams.get('date') ?? getLocalDateString()
   try {
     const res = await fetch(
       `https://api-web.nhle.com/v1/schedule/${date}`,

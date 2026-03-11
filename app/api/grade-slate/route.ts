@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { getLocalDateString } from '@/lib/dateUtils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,7 +9,7 @@ const supabase = createClient(
 export async function GET() {
   try {
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString()
 
     const { data: slate } = await supabase
       .from('slates')

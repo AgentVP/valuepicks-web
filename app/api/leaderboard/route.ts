@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
+import { getLocalDateString } from '@/lib/dateUtils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,7 +45,7 @@ function pickResult(p: Pick): boolean | null {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
-    const date = url.searchParams.get('date')?.trim() || new Date().toISOString().split('T')[0]
+    const date = url.searchParams.get('date')?.trim() || getLocalDateString()
 
     const { data: slate, error: slateError } = await supabase
       .from('slates')

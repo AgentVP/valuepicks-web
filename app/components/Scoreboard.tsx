@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getLocalDateString } from '@/lib/dateUtils'
 
 type Game = {
   id: number
@@ -25,7 +26,7 @@ export default function Scoreboard() {
   }, [])
 
   async function loadGames() {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString()
     try {
       const res = await fetch(`/api/schedule?date=${today}`, { cache: 'no-store' })
       if (!res.ok) return

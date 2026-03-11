@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
+import { getLocalDateString } from '@/lib/dateUtils'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
       return Response.json({ success: false, error: 'No picks submitted' }, { status: 400 })
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString()
 
     const { data: slate, error: slateError } = await supabase
       .from('slates')
