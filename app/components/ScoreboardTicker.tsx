@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { getLocalDateString } from '@/lib/dateUtils'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
 type NhlGame = {
@@ -46,8 +45,9 @@ export default function ScoreboardTicker() {
   }, [])
 
   async function load() {
-    const today = getLocalDateString()
     try {
+      const dateRes = await fetch('/api/contest-date', { cache: 'no-store' })
+      const { date: today } = (await dateRes.json()) as { date: string }
       const { data: slateRows } = await supabase
         .from('slates')
         .select('id')
@@ -116,7 +116,9 @@ export default function ScoreboardTicker() {
           isFinal: !!isFinal,
         }
       })
-      setGames(items)
+      // Only show ticker when there is at least one live game.
+      const liveOnly = items.filter((i) => i.isLive)
+      setGames(liveOnly)
     } catch (_) {
       setGames([])
     }

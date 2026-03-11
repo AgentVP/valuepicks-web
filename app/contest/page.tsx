@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { getLocalDateString } from '@/lib/dateUtils'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
 type DbGame = {
@@ -55,42 +54,50 @@ export default function ContestPage() {
   }
 
   async function loadGames() {
-    const today = getLocalDateString()
-    await fetch(`/api/generate-slate?date=${today}`)
-    const { data: slateRows } = await supabase
-      .from('slates')
-      .select('id')
-      .eq('slate_date', today)
-      .order('id', { ascending: false })
-      .limit(1)
-    const slate = slateRows?.[0] ?? null
-    if (!slate) return
-    const { data: raw } = await supabase
-      .from('games')
-      .select('id, away_team, home_team, start_time, status')
-      .eq('slate_id', slate.id)
-      .order('start_time')
-    const byCanonical = new Map<string, DbGame>()
-    for (const g of raw || []) {
-      const awayCanon = teamToCanonicalAbbrev(g.away_team)
-      const homeCanon = teamToCanonicalAbbrev(g.home_team)
-      const key = `${awayCanon}_${homeCanon}`
-      const existing = byCanonical.get(key)
-      const gIsCanonical = g.away_team === awayCanon && g.home_team === homeCanon
-      const normalized = { ...g, away_team: awayCanon, home_team: homeCanon }
-      if (!existing) {
-        byCanonical.set(key, normalized)
-      } else {
-        const exIsCanonical =
-          existing.away_team === teamToCanonicalAbbrev(existing.away_team) &&
-          existing.home_team === teamToCanonicalAbbrev(existing.home_team)
-        if (gIsCanonical && !exIsCanonical) byCanonical.set(key, normalized)
+    try {
+      const dateRes = await fetch('/api/contest-date', { cache: 'no-store' })
+      const { date: today } = (await dateRes.json()) as { date: string }
+      await fetch(`/api/generate-slate?date=${today}`, { cache: 'no-store' })
+      const { data: slateRows } = await supabase
+        .from('slates')
+        .select('id')
+        .eq('slate_date', today)
+        .order('id', { ascending: false })
+        .limit(1)
+      const slate = slateRows?.[0] ?? null
+      if (!slate) {
+        setGames([])
+        return
       }
+      const { data: raw } = await supabase
+        .from('games')
+        .select('id, away_team, home_team, start_time, status')
+        .eq('slate_id', slate.id)
+        .order('start_time')
+      const byCanonical = new Map<string, DbGame>()
+      for (const g of raw || []) {
+        const awayCanon = teamToCanonicalAbbrev(g.away_team)
+        const homeCanon = teamToCanonicalAbbrev(g.home_team)
+        const key = `${awayCanon}_${homeCanon}`
+        const existing = byCanonical.get(key)
+        const gIsCanonical = g.away_team === awayCanon && g.home_team === homeCanon
+        const normalized = { ...g, away_team: awayCanon, home_team: homeCanon }
+        if (!existing) {
+          byCanonical.set(key, normalized)
+        } else {
+          const exIsCanonical =
+            existing.away_team === teamToCanonicalAbbrev(existing.away_team) &&
+            existing.home_team === teamToCanonicalAbbrev(existing.home_team)
+          if (gIsCanonical && !exIsCanonical) byCanonical.set(key, normalized)
+        }
+      }
+      const data = Array.from(byCanonical.values()).sort(
+        (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+      )
+      setGames(data)
+    } catch (_) {
+      setGames([])
     }
-    const data = Array.from(byCanonical.values()).sort(
-      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    )
-    setGames(data)
   }
 
   async function loadOdds() {

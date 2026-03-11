@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { getLocalDateString } from '@/lib/dateUtils'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
 type Game = {
@@ -54,7 +53,8 @@ export default function TodayPage() {
   }, [])
 
   async function loadPage() {
-    const today = getLocalDateString()
+    const dateRes = await fetch('/api/contest-date', { cache: 'no-store' })
+    const { date: today } = (await dateRes.json()) as { date: string }
 
     const { data: slateRows } = await supabase
       .from('slates')

@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getLocalDateString } from '@/lib/dateUtils'
-
 type Game = {
   id: number
   awayTeam: { abbrev: string; score?: number }
@@ -26,16 +24,19 @@ export default function Scoreboard() {
   }, [])
 
   async function loadGames() {
-    const today = getLocalDateString()
     try {
+      const dateRes = await fetch('/api/contest-date', { cache: 'no-store' })
+      const { date: today } = (await dateRes.json()) as { date: string }
       const res = await fetch(`/api/schedule?date=${today}`, { cache: 'no-store' })
       if (!res.ok) return
       const json = await res.json()
-      const list =
+      const all =
         json.gameWeek
           ?.filter((d: { date: string }) => d.date === today)
           ?.flatMap((d: { games?: Game[] }) => d.games || []) || []
-      setGames(list)
+      // Only show games that are actually live (NHL gameState === 'LIVE')
+      const liveOnly = all.filter((g: Game) => g.gameState === 'LIVE')
+      setGames(liveOnly)
     } catch (_) {
       setGames([])
     }

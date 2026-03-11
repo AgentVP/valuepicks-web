@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getLocalDateString, getYesterdayContestDate } from '@/lib/dateUtils'
+import { getLocalDateString, getLeaderboardDisplayDate, getYesterdayContestDate } from '@/lib/dateUtils'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
 type Game = {
@@ -97,26 +97,27 @@ export default function LeaderboardPage() {
   }
 
   async function loadBoard() {
+    // Show yesterday's results until 2pm Eastern, then today's.
+    const primaryDate = getLeaderboardDisplayDate()
     const today = getLocalDateString()
 
     try {
-      let res = await fetch(`/api/leaderboard?date=${encodeURIComponent(today)}`, { cache: 'no-store' })
+      let res = await fetch(`/api/leaderboard?date=${encodeURIComponent(primaryDate)}`, { cache: 'no-store' })
       if (!res.ok) throw new Error(`Leaderboard API error ${res.status}`)
       let json = await res.json()
       let rawGames: Game[] = json.games || []
       let rawEntries: Entry[] = json.entries || []
       let rawPot = json.potInfo ?? null
-      let effectiveDate = today
+      let effectiveDate = primaryDate
 
-      if (rawEntries.length === 0 && rawGames.length === 0) {
-        const yesterday = getYesterdayContestDate()
-        res = await fetch(`/api/leaderboard?date=${encodeURIComponent(yesterday)}`, { cache: 'no-store' })
+      if (rawEntries.length === 0 && rawGames.length === 0 && primaryDate !== today) {
+        res = await fetch(`/api/leaderboard?date=${encodeURIComponent(today)}`, { cache: 'no-store' })
         if (res.ok) {
           json = await res.json()
           rawGames = json.games || []
           rawEntries = json.entries || []
           rawPot = json.potInfo ?? null
-          effectiveDate = yesterday
+          effectiveDate = today
         }
       }
 

@@ -26,3 +26,24 @@ export function getYesterdayContestDate(): string {
   const yesterday = new Date(d.getTime() - 24 * 60 * 60 * 1000)
   return getContestDateString(yesterday)
 }
+
+/**
+ * Date to use for the daily leaderboard: yesterday until 2pm Eastern the next day, then today.
+ * So "yesterday's" results stay visible until 2pm Eastern, then we show today's slate.
+ */
+export function getLeaderboardDisplayDate(): string {
+  const now = new Date()
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: CONTEST_TIME_ZONE,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  })
+  const [hour, minute] = formatter.format(now).split(':').map(Number)
+  const minutesSinceMidnight = (hour ?? 0) * 60 + (minute ?? 0)
+  const twoPM = 14 * 60
+  if (minutesSinceMidnight < twoPM) {
+    return getYesterdayContestDate()
+  }
+  return getContestDateString(now)
+}
