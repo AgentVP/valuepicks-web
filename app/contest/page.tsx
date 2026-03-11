@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
+import { getCalendarDateInEastern } from '@/lib/dateUtils'
 
 type DbGame = {
   id: number
@@ -91,9 +92,11 @@ export default function ContestPage() {
           if (gIsCanonical && !exIsCanonical) byCanonical.set(key, normalized)
         }
       }
-      const data = Array.from(byCanonical.values()).sort(
+      const all = Array.from(byCanonical.values()).sort(
         (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
       )
+      // Only show games whose Eastern calendar date is the contest date (exclude yesterday or any other date)
+      const data = all.filter((g) => getCalendarDateInEastern(new Date(g.start_time)) === today)
       setGames(data)
     } catch (_) {
       setGames([])

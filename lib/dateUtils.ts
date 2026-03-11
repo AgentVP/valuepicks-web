@@ -31,6 +31,16 @@ export function getContestDateString(d: Date = new Date()): string {
   return dateFormatter.format(d)
 }
 
+/** Calendar date YYYY-MM-DD in Eastern for a given moment (no 1am rollover). Use to compare game start_time to contest date. */
+export function getCalendarDateInEastern(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: CONTEST_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d)
+}
+
 /** Back-compat alias used throughout the app. */
 export function getLocalDateString(): string {
   return getContestDateString()
