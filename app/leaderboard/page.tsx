@@ -150,16 +150,16 @@ export default function LeaderboardPage() {
   /** Thumbnail style: light green when pick is winning live, light red when losing; full green/red when game final. */
   function boxStyle(p: Pick): string {
     const g = p.games?.[0]
-    if (!g) return 'bg-[var(--card-border)]'
+    if (!g) return 'bg-[var(--card-border)] ring-1 ring-white/10'
     const r = computedResult(p)
-    if (r === true) return 'bg-[var(--win)]'
-    if (r === false) return 'bg-[var(--loss)]'
-    if (g.away_score === null || g.home_score === null) return 'bg-[var(--card-border)]'
-    if (g.away_score === g.home_score) return 'bg-[var(--ice)]/25'
+    if (r === true) return 'bg-[var(--win)]/25 ring-2 ring-[var(--win)]'
+    if (r === false) return 'bg-[var(--loss)]/25 ring-2 ring-[var(--loss)]'
+    if (g.away_score === null || g.home_score === null) return 'bg-[var(--card-border)] ring-1 ring-white/10'
+    if (g.away_score === g.home_score) return 'bg-[var(--ice)]/25 ring-1 ring-white/10'
     const leading = g.away_score > g.home_score ? g.away_team : g.home_team
     return p.picked_team === leading
-      ? 'bg-[var(--win)]/50'
-      : 'bg-[var(--loss)]/50'
+      ? 'bg-[var(--win)]/15 ring-2 ring-[var(--win)]/60'
+      : 'bg-[var(--loss)]/15 ring-2 ring-[var(--loss)]/60'
   }
 
   function pickForGame(entry: Entry, gameId: number) {
@@ -181,6 +181,25 @@ export default function LeaderboardPage() {
       <p className="text-[var(--ice)]/70 text-sm mb-2">
         Ties broken by parlay odds (higher = better). Add odds when you submit picks to use the tiebreaker.
       </p>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--ice)]/70 mb-3">
+        <span className="font-medium">Legend:</span>
+        <span className="inline-flex items-center gap-2">
+          <span className="w-3 h-3 rounded-sm bg-[var(--win)] border border-white/10" />
+          Win
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="w-3 h-3 rounded-sm bg-[var(--loss)] border border-white/10" />
+          Loss
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="w-3 h-3 rounded-sm bg-[var(--win)]/50 border border-white/10" />
+          Currently winning
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="w-3 h-3 rounded-sm bg-[var(--loss)]/50 border border-white/10" />
+          Currently losing
+        </span>
+      </div>
       <p className="text-[var(--ice)]/90 text-sm font-medium mb-4">
         Entry fee: <span className="text-white font-semibold">${ENTRY_FEE.toFixed(2)}</span>
       </p>
