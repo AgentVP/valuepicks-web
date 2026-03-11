@@ -150,12 +150,21 @@ export default function LeaderboardPage() {
   /** Thumbnail style: light green when pick is winning live, light red when losing; full green/red when game final. */
   function boxStyle(p: Pick): string {
     const g = p.games?.[0]
-    // Use ring + ring-offset so the highlight is visible at 32px.
-    const neutral = 'bg-[var(--card-border)] ring-1 ring-inset ring-white/10'
-    const winFinal = 'bg-[var(--win)]/25 ring-2 ring-inset ring-[var(--win)] ring-offset-2 ring-offset-[var(--card)]'
-    const lossFinal = 'bg-[var(--loss)]/25 ring-2 ring-inset ring-[var(--loss)] ring-offset-2 ring-offset-[var(--card)]'
-    const winLive = 'bg-[var(--win)]/15 ring-2 ring-inset ring-[var(--win)]/70 ring-offset-2 ring-offset-[var(--card)]'
-    const lossLive = 'bg-[var(--loss)]/15 ring-2 ring-inset ring-[var(--loss)]/70 ring-offset-2 ring-offset-[var(--card)]'
+    // Make result states unmissable at 32px: outline + glow (ring alone can be too subtle).
+    const base = 'ring-1 ring-inset ring-white/10'
+    const neutral = `bg-[var(--card-border)] ${base}`
+    const winFinal =
+      `bg-[var(--win)]/30 ${base} outline outline-2 outline-[var(--win)] outline-offset-2 ` +
+      `shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_0_14px_rgba(34,197,94,0.35)]`
+    const lossFinal =
+      `bg-[var(--loss)]/30 ${base} outline outline-2 outline-[var(--loss)] outline-offset-2 ` +
+      `shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_0_14px_rgba(239,68,68,0.35)]`
+    const winLive =
+      `bg-[var(--win)]/20 ${base} outline outline-2 outline-[var(--win)]/70 outline-offset-2 ` +
+      `shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_0_12px_rgba(34,197,94,0.22)]`
+    const lossLive =
+      `bg-[var(--loss)]/20 ${base} outline outline-2 outline-[var(--loss)]/70 outline-offset-2 ` +
+      `shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_0_12px_rgba(239,68,68,0.22)]`
 
     if (!g) return neutral
     const r = computedResult(p)
