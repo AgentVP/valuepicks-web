@@ -13,7 +13,8 @@
     "dev:analytics": "npm --workspace valuepicks-analytics run dev",
     "build:analytics": "npm --workspace valuepicks-analytics run build",
     "start:analytics": "npm --workspace valuepicks-analytics run start",
-    "lint:analytics": "npm --workspace valuepicks-analytics run lint"
+    "lint:analytics": "npm --workspace valuepicks-analytics run lint",
+    "test:analytics-data": "node apps/analytics/scripts/test-goal-tracking.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",

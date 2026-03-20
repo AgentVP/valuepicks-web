@@ -2,44 +2,27 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
-
-const SECTIONS = [
-  {
-    href: '/shot-bets',
-    title: 'Shot Bets',
-    description: 'Over/under shot totals by model (L10, H/A). Cumulative win rates and confidence.',
-    available: true,
-  },
-  {
-    href: '/moneyline',
-    title: 'Moneyline',
-    description: 'Moneyline bet performance by model and context.',
-    available: false,
-  },
-  {
-    href: '/ou',
-    title: 'O/U',
-    description: 'Over/under (goals, totals) analytics by model.',
-    available: false,
-  },
-  {
-    href: '/save-bets',
-    title: 'Save Bets',
-    description: 'Save bet (goalie) performance and win rates.',
-    available: false,
-  },
-] as const
+import { aggregateByBucket } from '@/lib/goalTrackingUtils'
+import type { GoalTrackingRow } from '@/lib/goalTrackingUtils'
+import BucketChart from './components/BucketChart'
 
 export default function AnalyticsHubPage() {
   const router = useRouter()
   const [authChecked, setAuthChecked] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [rows, setRows] = useState<GoalTrackingRow[]>([])
+  const [dataError, setDataError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     async function run() {
+      if (!supabase) {
+        if (!cancelled) setDataError('Supabase not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to apps/analytics/.env.local')
+        setAuthChecked(true)
+        setLoading(false)
+        return
+      }
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -49,7 +32,28 @@ export default function AnalyticsHubPage() {
         return
       }
       setAuthChecked(true)
-      setLoading(false)
+
+      // Fetch Goal Tracking data
+      try {
+        const res = await fetch('/api/analytics/data', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (!res.ok) {
+          if (res.status === 401) {
+            router.replace('/login?redirect=/')
+            return
+          }
+          setDataError('Failed to load analytics data')
+          setLoading(false)
+          return
+        }
+        const json = await res.json()
+        const data = json?.data && Array.isArray(json.data) ? json.data : []
+        if (!cancelled) setRows(data)
+      } catch {
+        if (!cancelled) setDataError('Failed to load analytics data')
+      }
+      if (!cancelled) setLoading(false)
     }
     run()
     return () => {
@@ -58,7 +62,7 @@ export default function AnalyticsHubPage() {
   }, [router])
 
   async function handleSignOut() {
-    await supabase.auth.signOut()
+    if (supabase) await supabase.auth.signOut()
     router.replace('/login')
   }
 
@@ -71,13 +75,18 @@ export default function AnalyticsHubPage() {
     )
   }
 
+  const undersL10 = aggregateByBucket(rows, 'L10', 'under')
+  const undersHA = aggregateByBucket(rows, 'HA', 'under')
+  const oversL10 = aggregateByBucket(rows, 'L10', 'over')
+  const oversHA = aggregateByBucket(rows, 'HA', 'over')
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white">Analytics</h1>
           <p className="text-[var(--ice)]/70 text-sm mt-0.5">
-            Pick a bet type to view charts and winning percentages by model.
+            Win % by bucket (0 to ±7 in 0.5 steps). Green = &gt;58% win rate.
           </p>
         </div>
         <button
@@ -89,42 +98,18 @@ export default function AnalyticsHubPage() {
         </button>
       </div>
 
-      <nav className="grid gap-4 sm:grid-cols-2">
-        {SECTIONS.map((section) => (
-          <Link
-            key={section.href}
-            href={section.available ? section.href : '#'}
-            className={`rounded-xl border overflow-hidden transition-all duration-200 block text-left ${
-              section.available
-                ? 'border-[var(--card-border)] bg-[var(--card)] hover:border-[var(--accent)]/50 hover:bg-[var(--card)]/90 card-hover'
-                : 'border-[var(--card-border)]/60 bg-[var(--card)]/60 opacity-75 cursor-default'
-            }`}
-            onClick={(e) => {
-              if (!section.available) e.preventDefault()
-            }}
-          >
-            <div className="p-5">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">{section.title}</h2>
-                {!section.available && (
-                  <span className="text-xs font-medium text-[var(--ice)]/60 bg-white/10 px-2 py-0.5 rounded">
-                    Coming soon
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-[var(--ice)]/70 mt-1.5">
-                {section.description}
-              </p>
-              {section.available && (
-                <span className="inline-block mt-3 text-sm font-medium text-[var(--accent)]">
-                  View charts →
-                </span>
-              )}
-            </div>
-          </Link>
-        ))}
-      </nav>
+      {dataError && (
+        <div className="rounded-xl border border-[var(--loss)]/50 bg-[var(--loss)]/10 text-[var(--loss)] px-4 py-3 mb-6">
+          {dataError}
+        </div>
+      )}
+
+      <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2">
+        <BucketChart title="Unders L10" data={undersL10} betType="under" />
+        <BucketChart title="Unders H/A" data={undersHA} betType="under" />
+        <BucketChart title="Overs L10" data={oversL10} betType="over" />
+        <BucketChart title="Overs H/A" data={oversHA} betType="over" />
+      </div>
     </div>
   )
 }
-

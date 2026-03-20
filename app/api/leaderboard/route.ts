@@ -49,15 +49,18 @@ export async function GET(req: Request) {
     const url = new URL(req.url)
     const date = url.searchParams.get('date')?.trim() || getLocalDateString()
 
-    const { data: slate, error: slateError } = await supabase
+    // Do not use .maybeSingle(): duplicate slates for the same slate_date would error (PGRST116)
+    // and return no data. Today page uses limit(1) + first row — match that here.
+    const { data: slateRows, error: slateError } = await supabase
       .from('slates')
       .select('id')
       .eq('slate_date', date)
       .order('id', { ascending: false })
       .limit(1)
-      .maybeSingle()
 
-    if (slateError || !slate) {
+    const slate = !slateError && slateRows?.[0] ? slateRows[0] : null
+
+    if (!slate) {
       return Response.json({ games: [], entries: [], potInfo: null })
     }
 
@@ -145,6 +148,14 @@ export async function GET(req: Request) {
       if (awayScore > homeScore) computedWinnerByDbGameId.set(g.id, nhl.awayTeam.abbrev)
       else if (homeScore > awayScore) computedWinnerByDbGameId.set(g.id, nhl.homeTeam.abbrev)
       else computedWinnerByDbGameId.set(g.id, null)
+    }
+
+    // Picks may reference merged duplicate game rows; copy winner onto alternate ids.
+    for (const g of games) {
+      const w = computedWinnerByDbGameId.get(g.id) ?? null
+      for (const altId of g.alternateGameIds ?? []) {
+        computedWinnerByDbGameId.set(altId, w)
+      }
     }
 
     const { data: entryRows, error: entriesError } = await supabase

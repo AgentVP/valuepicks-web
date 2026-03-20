@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getLocalDateString, getLeaderboardDisplayDate, getYesterdayContestDate } from '@/lib/dateUtils'
+import { getLeaderboardDisplayDate, getLocalDateString } from '@/lib/dateUtils'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
 type Game = {
@@ -81,6 +81,7 @@ export default function LeaderboardPage() {
   const [games, setGames] = useState<Game[]>([])
   const [potInfo, setPotInfo] = useState<{ entryCount: number; pot: number; perWinner: number } | null>(null)
   const [slateDate, setSlateDate] = useState<string | null>(null)
+  const [contestToday, setContestToday] = useState<string | null>(null)
 
   useEffect(() => {
     loadBoard()
@@ -97,9 +98,20 @@ export default function LeaderboardPage() {
   }
 
   async function loadBoard() {
-    // Show yesterday's results until 2pm Eastern, then today's.
-    const primaryDate = getLeaderboardDisplayDate()
-    const today = getLocalDateString()
+    // Server clock matches /api/contest-date; leaderboard = yesterday until 2pm ET.
+    let primaryDate: string
+    let today: string
+    try {
+      const ctxRes = await fetch('/api/leaderboard-context', { cache: 'no-store' })
+      const ctx = (await ctxRes.json()) as { contestDate?: string; leaderboardDate?: string }
+      primaryDate = ctx.leaderboardDate ?? ''
+      today = ctx.contestDate ?? ''
+      if (!primaryDate || !today) throw new Error('leaderboard-context')
+    } catch {
+      primaryDate = getLeaderboardDisplayDate()
+      today = getLocalDateString()
+    }
+    setContestToday(today)
 
     try {
       let res = await fetch(`/api/leaderboard?date=${encodeURIComponent(primaryDate)}`, { cache: 'no-store' })
@@ -202,7 +214,7 @@ export default function LeaderboardPage() {
     return p.picked_team === leading ? 'winning' : 'losing'
   }
 
-  const isToday = slateDate === getLocalDateString()
+  const isToday = contestToday != null && slateDate === contestToday
 
   return (
     <div className="max-w-2xl mx-auto">

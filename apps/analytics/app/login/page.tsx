@@ -18,6 +18,11 @@ function LoginForm() {
     setError('')
     setLoading(true)
     try {
+      if (!supabase) {
+        setError('Supabase not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to apps/analytics/.env.local')
+        setLoading(false)
+        return
+      }
       const { data, error: err } = await supabase.auth.signInWithPassword({
         email,
         password,

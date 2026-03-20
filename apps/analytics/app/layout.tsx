@@ -24,9 +24,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <header className="border-b border-[var(--card-border)] bg-[var(--card)]/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-            <Link href="/" className="font-bold text-white">
-              ValuePicks <span className="text-[var(--accent)]">Analytics</span>
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/" className="font-bold text-white">
+                ValuePicks <span className="text-[var(--accent)]">Analytics</span>
+              </Link>
+              <Link href="/moneyline" className="text-sm text-[var(--ice)]/70 hover:text-[var(--accent)]">
+                Moneyline
+              </Link>
+            </div>
             <Link href="https://valuepicks.pro" className="text-sm text-[var(--ice)]/70 hover:text-[var(--accent)]">
               Back to Pick’em
             </Link>

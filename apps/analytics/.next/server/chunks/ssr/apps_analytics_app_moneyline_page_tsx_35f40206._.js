@@ -1,3 +1,0 @@
-module.exports=[43945,a=>{"use strict";var b=a.i(87924),c=a.i(38246);function d(){return(0,b.jsxs)("div",{className:"max-w-3xl mx-auto",children:[(0,b.jsx)(c.default,{href:"/",className:"text-sm text-[var(--ice)]/70 hover:text-[var(--accent)]",children:"← Analytics"}),(0,b.jsx)("h1",{className:"text-2xl font-bold text-white mt-3",children:"Moneyline"}),(0,b.jsx)("p",{className:"text-[var(--ice)]/70 mt-2",children:"Coming soon."})]})}a.s(["default",()=>d])}];
-
-//# sourceMappingURL=apps_analytics_app_moneyline_page_tsx_35f40206._.js.map

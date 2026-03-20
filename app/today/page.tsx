@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
+import { getCalendarDateInEastern } from '@/lib/dateUtils'
 
 type Game = {
   id: number
@@ -64,7 +65,10 @@ export default function TodayPage() {
       .limit(1)
 
     const slate = slateRows?.[0] ?? null
-    if (!slate) return
+    if (!slate) {
+      setGames([])
+      return
+    }
 
     const { data: gameRows } = await supabase
       .from('games')
@@ -101,9 +105,9 @@ export default function TodayPage() {
         else if (!existing.nhl_game_id && g.nhl_game_id) byCanonical.set(key, normalized)
       }
     }
-    let gamesList = Array.from(byCanonical.values()).sort(
-      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    )
+    let gamesList = Array.from(byCanonical.values())
+      .filter((g) => getCalendarDateInEastern(new Date(g.start_time)) === today)
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
     try {
       const [nhlRes, oddsRes] = await Promise.all([
