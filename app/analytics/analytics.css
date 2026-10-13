@@ -1,0 +1,46 @@
+/* Analytics page — scoped with pla-; uses the site's color tokens */
+.pla { --pla-muted: rgba(224,242,254,.62); --pla-line: var(--card-border); --pla-good: rgba(34,197,94,.20); --pla-ok: rgba(34,197,94,.08);
+  display: grid; gap: 18px; font-variant-numeric: tabular-nums; }
+.pla-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 20px }
+.pla-head h1 { font-size: 1.6rem; font-weight: 800; color: #fff; margin: 0 }
+.pla-sub { color: var(--pla-muted); font-size: .85rem; margin-top: 2px; max-width: 62ch }
+.pla-tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--pla-line); padding-bottom: 8px }
+.pla-tabs button { font: inherit; font-weight: 700; font-size: .9rem; color: var(--pla-muted); background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 7px 14px; cursor: pointer }
+.pla-tabs button[aria-selected="true"] { color: var(--background); background: var(--accent) }
+.pla-tabs button:hover:not([aria-selected="true"]) { color: #fff; border-color: var(--pla-line) }
+.pla-filters { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; background: var(--card); border: 1px solid var(--pla-line); border-radius: 12px; padding: 10px 14px }
+.pla-filters .grp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+.pla-filters .lbl { font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: var(--pla-muted); margin-right: 2px }
+.pla-chip { font: inherit; font-size: .8rem; font-weight: 600; color: var(--ice); background: var(--background); border: 1px solid var(--pla-line); border-radius: 999px; padding: 4px 10px; cursor: pointer }
+.pla-chip[aria-pressed="true"] { background: var(--ice); color: var(--background); border-color: var(--ice) }
+.pla-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)) }
+.pla-card { background: var(--card); border: 1px solid var(--pla-line); border-radius: 12px; overflow: hidden; min-width: 0 }
+.pla-card h3 { margin: 0; padding: 10px 14px; font-size: .95rem; font-weight: 700; color: #fff; border-bottom: 1px solid var(--pla-line); display: flex; justify-content: space-between; gap: 8px; align-items: baseline }
+.pla-card h3 small { font-weight: 500; color: var(--pla-muted); font-size: .75rem }
+.pla-model { font-size: .66rem; font-weight: 800; letter-spacing: .08em; padding: 2px 7px; border-radius: 5px; margin-right: 8px; vertical-align: 2px }
+.pla-model.l10 { background: rgba(167,139,250,.18); color: #c4b5fd }
+.pla-model.ha { background: rgba(56,189,248,.18); color: #7dd3fc }
+.pla-scroll { overflow-x: auto }
+.pla table { width: 100%; border-collapse: collapse; font-size: .8rem }
+.pla th { font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; color: var(--pla-muted); font-weight: 600; text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--pla-line); white-space: nowrap }
+.pla th:first-child, .pla td:first-child { text-align: left }
+.pla td { padding: 6px 10px; text-align: right; border-bottom: 1px solid rgba(51,65,85,.5); white-space: nowrap; font-family: var(--font-mono), ui-monospace, monospace; color: var(--ice) }
+.pla tr:last-child td { border-bottom: 0 }
+.pla tr.good td { background: var(--pla-good) }
+.pla tr.ok td { background: var(--pla-ok) }
+.pla tr.empty td { color: rgba(224,242,254,.3) }
+.pla td.bar { min-width: 120px }
+.pla-barwrap { display: flex; align-items: center; gap: 6px; justify-content: flex-end }
+.pla-bar { position: relative; width: 64px; height: 8px; border-radius: 4px; background: rgba(224,242,254,.08); overflow: hidden }
+.pla-bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 4px }
+.pla-bar b { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgba(255,255,255,.55) }
+.pla .pos { color: var(--win); font-weight: 700 } .pla .neg { color: var(--loss) }
+.pla-foot { padding: 7px 14px; font-size: .72rem; color: var(--pla-muted); border-top: 1px solid var(--pla-line) }
+.pla-note { background: var(--card); border: 1px solid var(--pla-line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; font-size: .85rem; color: var(--ice) }
+.pla-note.err { border-left-color: var(--loss) }
+.pla-stats { display: flex; flex-wrap: wrap; gap: 8px }
+.pla-stat { background: var(--card); border: 1px solid var(--pla-line); border-radius: 10px; padding: 8px 12px; display: grid; gap: 2px; min-width: 130px }
+.pla-stat b { color: #fff; font-size: 1.25rem }
+.pla-stat small { font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: var(--pla-muted) }
+.pla-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .78rem; color: var(--pla-muted); align-items: center }
+.pla-sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px }

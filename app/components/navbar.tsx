@@ -59,14 +59,12 @@ export default function Navbar() {
           >
             Board
           </Link>
-          <a
-            href="https://valuepicks.pro/analytics"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={inactive + ' ' + base}
+          <Link
+            href="/analytics"
+            className={`${base} ${pathname === '/analytics' ? active : inactive}`}
           >
             Analytics
-          </a>
+          </Link>
         </nav>
       </div>
       <Scoreboard />
