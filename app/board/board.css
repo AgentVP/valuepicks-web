@@ -60,3 +60,13 @@
 .plb-bkt.hit { color: var(--win); font-weight: 700 }
 .plb-tag.l10 { background: rgba(167,139,250,.18); color: #c4b5fd }
 .plb-tag.ha { background: rgba(56,189,248,.18); color: #7dd3fc }
+.plb-logbtn { font-size: .68rem !important; padding: 1px 7px !important; margin-left: 6px; border-radius: 999px !important }
+.plb-betform { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; padding: 10px 14px; border-top: 1px solid var(--plb-line); background: rgba(56,189,248,.06) }
+.plb-betform > b { width: 100%; color: #fff; font-size: .85rem }
+.plb-betform label { display: grid; gap: 3px; font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; color: var(--plb-muted) }
+.plb-betform input, .plb-betform select { font: inherit; font-size: .85rem; text-transform: none; letter-spacing: 0; color: var(--foreground); background: var(--background); border: 1px solid var(--plb-line); border-radius: 6px; padding: 5px 8px; width: 7.5em }
+.plb-betform label.wide input { width: 14em }
+.plb-betbtns { display: flex; gap: 6px }
+.plb-betnote { width: 100%; font-size: .8rem } .plb-betnote.err { color: var(--loss) }
+.plb-mybet { display: inline-block; margin-left: 6px; font-family: var(--font-mono), monospace; font-size: .66rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: rgba(251,191,36,.16); color: var(--live) }
+.plb-del { font-size: .72rem !important; padding: 1px 7px !important }

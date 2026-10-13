@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { bandOf, bandLabel, type BucketStats } from '@/lib/shotBuckets'
+import { BetForm, MyBets, describe, odds as fmtOdds, type Bet } from './bets'
 import './board.css'
 
 type Row = Record<string, string | number | boolean | null>
@@ -30,6 +31,8 @@ export default function PuckLineBoard() {
   const [evThr, setEvThr] = useState(5)
   const [playsOnly, setPlaysOnly] = useState(false)
   const [buckets, setBuckets] = useState<BucketStats>({})
+  const [bets, setBets] = useState<Bet[]>([])
+  const [betFor, setBetFor] = useState<string | null>(null)
   const [bktThr, setBktThr] = useState(55)
   const [minN, setMinN] = useState(20)
 
@@ -58,7 +61,15 @@ export default function PuckLineBoard() {
     finally { setLoading(false) }
   }, [token, date, router])
 
+  const loadBets = useCallback(async () => {
+    if (!token) return
+    try {
+      const res = await fetch('/api/bets', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+      if (res.ok) setBets((await res.json()).bets || [])
+    } catch { /* bets section just stays as is */ }
+  }, [token])
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadBets() }, [loadBets])
   useEffect(() => {
     const id = setInterval(() => { if (!document.hidden && date === etToday()) load() }, 10 * 60 * 1000)
     return () => clearInterval(id)
@@ -184,7 +195,7 @@ export default function PuckLineBoard() {
 
       <div className="plb-chips">
         {[[games.length, 'games'], [rows.filter(isBoth).length, 'both-model plays'], [rows.filter(isShotPlay).length, 'shot plays'], [rows.filter(isMlPlay).length, 'moneyline plays'],
-          [`${posted}/${rows.length}`, 'shot lines posted'], [graded ? `${graded / 2} final` : '—', 'results']].map(([b, s]) => (
+          [`${posted}/${rows.length}`, 'shot lines posted'], [graded ? `${graded / 2} final` : '—', 'results'], [bets.filter((b) => b.game_date === date).length, 'my bets today']].map(([b, s]) => (
           <div className="plb-chip" key={String(s)}><b>{b}</b><small>{s}</small></div>))}
       </div>
 
@@ -228,7 +239,11 @@ export default function PuckLineBoard() {
                 {[a, h].map((r) => (
                   <tr key={String(r.team)} className={isBoth(r) ? 'both' : ''}>
                     <td className="team">{r.team_name}<small>{r.home_away}</small>{r.b2b ? <> <span className="plb-tag b2b">B2B</span></> : null}
-                      {isBoth(r) ? <> <span className="plb-tag both">Both models {n(r.shots_delta_ha)! < 0 ? 'under' : 'over'}</span></> : null}</td>
+                      {isBoth(r) ? <> <span className="plb-tag both">Both models {n(r.shots_delta_ha)! < 0 ? 'under' : 'over'}</span></> : null}
+                      {bets.filter((b) => Number(b.game_id) === Number(r.game_id) && b.team === r.team).map((b) =>
+                        <span key={b.id} className="plb-mybet" title="Logged bet">{describe(b)} {fmtOdds(b.odds)}</span>)}
+                      {token && <button type="button" className="plb-logbtn" onClick={() => setBetFor(betFor === `${r.game_id}|${r.team}` ? null : `${r.game_id}|${r.team}`)}>
+                        {betFor === `${r.game_id}|${r.team}` ? 'Close' : '+ Log bet'}</button>}</td>
                     <td className="sep">{n(r.shots_line) === null ? <span className="plb-na">not posted</span> : <>{fmt(r.shots_line)}
                       <div className="plb-move">o{odds(r.shots_over_odds)} u{odds(r.shots_under_odds)}</div>
                       {n(r.shots_first) !== null && n(r.shots_first) !== n(r.shots_line) && <div className="plb-move">first {fmt(r.shots_first)}</div>}</>}</td>
@@ -250,6 +265,10 @@ export default function PuckLineBoard() {
                   </tr>))}
               </tbody>
             </table></div>
+            {[a, h].filter((r) => betFor === `${r.game_id}|${r.team}`).map((r) => token && (
+              <BetForm key={String(r.team)} row={r} date={date} token={token}
+                defaultBasis={isBoth(r) ? 'both' : (pickModel(r) ?? 'manual')}
+                onSaved={() => { setBetFor(null); loadBets() }} onCancel={() => setBetFor(null)} />))}
             <div className="plb-foot">
               <span><span className="plb-lbl">Game total</span><b>{tot === null ? '—' : fmt(tot)}</b>{tot !== null && <span className="plb-move"> o{odds(a.game_total_over_odds)} u{odds(a.game_total_under_odds)}</span>}
                 {n(a.total_open) !== null && n(a.total_open) !== tot && <span className="plb-move"> open {fmt(a.total_open)}</span>}</span>
@@ -259,6 +278,8 @@ export default function PuckLineBoard() {
             </div>
           </article>)
       })}
+
+      {token && <MyBets bets={bets} token={token} onChanged={loadBets} />}
 
       <section className="plb-ledger">
         <h3>Results ledger</h3>
