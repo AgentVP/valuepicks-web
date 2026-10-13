@@ -24,6 +24,7 @@ type Pick = {
   decimal_odds: number | null
   games: Array<{ winner_team: string | null }>
   computed_result?: boolean | null
+  live_status?: 'winning' | 'losing' | 'tied' | null
 }
 
 type Entry = {
@@ -124,12 +125,27 @@ export async function GET(req: Request) {
       nhlGames = []
     }
 
+    // The score feed carries live scores for games in progress; overlay it on the schedule when available.
+    try {
+      const scoreRes = await fetch(`https://api-web.nhle.com/v1/score/${date}`, { cache: 'no-store' })
+      if (scoreRes.ok) {
+        const scoreJson = await scoreRes.json()
+        const live: NhlGame[] = scoreJson.games || []
+        const byId = new Map(live.map((g) => [g.id, g]))
+        nhlGames = nhlGames.length ? nhlGames.map((g) => byId.get(g.id) ?? g) : live
+      }
+    } catch (_) {
+      /* schedule data alone still grades finals */
+    }
+
     const nhlById = new Map(nhlGames.map((g) => [g.id, g]))
     const nhlByMatchup = new Map(
       nhlGames.map((g) => [`${g.awayTeam?.abbrev}_${g.homeTeam?.abbrev}`, g] as const)
     )
 
     const computedWinnerByDbGameId = new Map<number, string | null>()
+    // Games in progress: who is leading right now (null leader = tied).
+    const liveByDbGameId = new Map<number, { leader: string | null }>()
     for (const g of games) {
       const nhl =
         (g.nhl_game_id != null ? nhlById.get(g.nhl_game_id) : null) ??
@@ -137,6 +153,15 @@ export async function GET(req: Request) {
       if (!nhl) {
         computedWinnerByDbGameId.set(g.id, null)
         continue
+      }
+      const st = nhl.gameState
+      const aS = nhl.awayTeam?.score ?? null, hS = nhl.homeTeam?.score ?? null
+      if (aS != null && hS != null && st !== 'FUT' && st !== 'PRE') {
+        g.away_score = aS
+        g.home_score = hS
+      }
+      if ((st === 'LIVE' || st === 'CRIT') && aS != null && hS != null) {
+        liveByDbGameId.set(g.id, { leader: aS > hS ? nhl.awayTeam.abbrev : hS > aS ? nhl.homeTeam.abbrev : null })
       }
       const isFinal = nhl.gameState === 'FINAL' || nhl.gameState === 'OFF'
       const awayScore = nhl.awayTeam?.score ?? null
@@ -153,8 +178,10 @@ export async function GET(req: Request) {
     // Picks may reference merged duplicate game rows; copy winner onto alternate ids.
     for (const g of games) {
       const w = computedWinnerByDbGameId.get(g.id) ?? null
+      const lv = liveByDbGameId.get(g.id)
       for (const altId of g.alternateGameIds ?? []) {
         computedWinnerByDbGameId.set(altId, w)
+        if (lv) liveByDbGameId.set(altId, lv)
       }
     }
 
@@ -184,6 +211,9 @@ export async function GET(req: Request) {
       for (const p of e.picks ?? []) {
         const winner = computedWinnerByDbGameId.get(p.game_id) ?? null
         p.computed_result = winner ? teamToCanonicalAbbrev(p.picked_team) === teamToCanonicalAbbrev(winner) : null
+        const lv = winner ? undefined : liveByDbGameId.get(p.game_id)
+        p.live_status = !lv ? null : lv.leader === null ? 'tied'
+          : teamToCanonicalAbbrev(p.picked_team) === teamToCanonicalAbbrev(lv.leader) ? 'winning' : 'losing'
       }
     }
 

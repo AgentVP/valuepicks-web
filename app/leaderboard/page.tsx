@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { getLeaderboardDisplayDate, getLocalDateString } from '@/lib/dateUtils'
 import { teamToCanonicalAbbrev } from '@/lib/nhlTeamNames'
 
@@ -30,6 +30,7 @@ type Pick = {
   decimal_odds: number | null
   games: PickGame[]
   computed_result?: boolean | null
+  live_status?: 'winning' | 'losing' | 'tied' | null
 }
 
 type Entry = {
@@ -176,27 +177,20 @@ export default function LeaderboardPage() {
     return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_dark.svg`
   }
 
-  /** Thumbnail style: light green when pick is winning live, light red when losing; full green/red when game final. */
-  function boxStyle(p: Pick): string {
-    const g = p.games?.[0]
-    // Use plain Tailwind color classes (not CSS-var arbitrary values) so production builds
-    // always include these styles.
-    const neutral = 'bg-[var(--card-border)] ring-1 ring-inset ring-white/10'
-    const winFinal = 'bg-emerald-500/20 ring-2 ring-inset ring-emerald-400 ring-offset-2 ring-offset-[var(--card)] shadow-[0_0_14px_rgba(52,211,153,0.35)]'
-    const lossFinal = 'bg-red-500/20 ring-2 ring-inset ring-red-400 ring-offset-2 ring-offset-[var(--card)] shadow-[0_0_14px_rgba(248,113,113,0.35)]'
-    const winLive = 'bg-emerald-500/10 ring-2 ring-inset ring-emerald-400/70 ring-offset-2 ring-offset-[var(--card)] shadow-[0_0_12px_rgba(52,211,153,0.22)]'
-    const lossLive = 'bg-red-500/10 ring-2 ring-inset ring-red-400/70 ring-offset-2 ring-offset-[var(--card)] shadow-[0_0_12px_rgba(248,113,113,0.22)]'
-
-    if (!g) return neutral
+  /**
+   * Pick box color, same as the History page: solid green = won, solid red = lost.
+   * While a game is live: light green = that team is leading, light red = trailing, ice = tied.
+   * Colors are inline so they never depend on which utility classes a build keeps.
+   */
+  function boxStyle(p: Pick): CSSProperties {
     const r = computedResult(p)
-    if (r === true) return winFinal
-    if (r === false) return lossFinal
-    if (g.away_score === null || g.home_score === null) return neutral
-    if (g.away_score === g.home_score) return 'bg-[var(--ice)]/25 ring-1 ring-inset ring-white/10'
-    const leading = g.away_score > g.home_score ? g.away_team : g.home_team
-    return p.picked_team === leading
-      ? winLive
-      : lossLive
+    if (r === true) return { background: 'var(--win)' }
+    if (r === false) return { background: 'var(--loss)' }
+    const live = pickLiveStatus(p)
+    if (live === 'winning') return { background: 'color-mix(in srgb, var(--win) 40%, transparent)', boxShadow: 'inset 0 0 0 1px var(--win)' }
+    if (live === 'losing') return { background: 'color-mix(in srgb, var(--loss) 40%, transparent)', boxShadow: 'inset 0 0 0 1px var(--loss)' }
+    if (live === 'tied') return { background: 'color-mix(in srgb, var(--ice) 25%, transparent)' }
+    return { background: 'var(--card-border)' }
   }
 
   function pickForGame(entry: Entry, game: Game) {
@@ -206,12 +200,8 @@ export default function LeaderboardPage() {
   }
 
   function pickLiveStatus(p: Pick): 'winning' | 'losing' | 'tied' | null {
-    const g = p.games?.[0]
-    if (!g || g.winner_team) return null
-    if (g.away_score == null || g.home_score == null) return null
-    if (g.away_score === g.home_score) return 'tied'
-    const leading = g.away_score > g.home_score ? g.away_team : g.home_team
-    return p.picked_team === leading ? 'winning' : 'losing'
+    if (computedResult(p) !== null) return null
+    return p.live_status ?? null
   }
 
   const isToday = contestToday != null && slateDate === contestToday
@@ -238,11 +228,11 @@ export default function LeaderboardPage() {
           Loss
         </span>
         <span className="inline-flex items-center gap-2">
-          <span className="w-3 h-3 rounded-sm bg-[var(--win)]/50 border border-white/10" />
+          <span className="w-3 h-3 rounded-sm border border-white/10" style={{ background: 'color-mix(in srgb, var(--win) 40%, transparent)' }} />
           Currently winning
         </span>
         <span className="inline-flex items-center gap-2">
-          <span className="w-3 h-3 rounded-sm bg-[var(--loss)]/50 border border-white/10" />
+          <span className="w-3 h-3 rounded-sm border border-white/10" style={{ background: 'color-mix(in srgb, var(--loss) 40%, transparent)' }} />
           Currently losing
         </span>
       </div>
@@ -330,7 +320,8 @@ export default function LeaderboardPage() {
                 return (
                   <div
                     key={game.id}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${boxStyle(pick)}`}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={boxStyle(pick)}
                     title={titleParts.join(' ')}
                   >
                     <img
