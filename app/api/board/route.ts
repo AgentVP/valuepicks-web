@@ -14,7 +14,7 @@ const SLATE_COLS = [
   'game_date', 'game_id', 'team', 'team_name', 'opponent', 'home_away', 'b2b', 'opp_b2b',
   'shots_line', 'shots_over_odds', 'shots_under_odds', 'x_shots_ha', 'x_shots_l10', 'shots_delta_ha', 'shots_delta_l10', 'shots_delta_ha_excel', 'shots_delta_l10_excel',
   'team_goals_line', 'team_goals_over_odds', 'team_goals_under_odds', 'x_goals_ha', 'x_goals_l10',
-  'game_total', 'game_total_over_odds', 'game_total_under_odds', 'x_game_total_ha', 'x_game_total_l10',
+  'game_total', 'game_total_over_odds', 'game_total_under_odds', 'x_game_total_ha', 'x_game_total_l10', 'x_saves_ha', 'x_saves_l10',
   'ml_odds', 'ml_implied_ha', 'ml_implied_l10', 'ml_ev_ha', 'ml_ev_l10', 'puck_line', 'puck_line_odds', 'saves_line', 'saves_over_odds', 'saves_under_odds',
   'actual_shots', 'actual_goals', 'actual_game_goals', 'won',
 ].join(',')

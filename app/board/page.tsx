@@ -33,10 +33,13 @@ export default function PuckLineBoard() {
   const [buckets, setBuckets] = useState<BucketStats>({})
   const [bets, setBets] = useState<Bet[]>([])
   const [betFor, setBetFor] = useState<string | null>(null)
+  const [units, setUnits] = useState(1)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const [bktThr, setBktThr] = useState(55)
   const [minN, setMinN] = useState(20)
 
-  useEffect(() => { setThr(readNum('plb_thr', 2)); setEvThr(readNum('plb_ev', 5)); setBktThr(readNum('plb_bkt', 55)); setMinN(readNum('plb_minn', 20)) }, [])
+  useEffect(() => { setThr(readNum('plb_thr', 2)); setEvThr(readNum('plb_ev', 5)); setBktThr(readNum('plb_bkt', 55)); setMinN(readNum('plb_minn', 20)); setUnits(readNum('plb_units', 1)) }, [])
 
   useEffect(() => {
     (async () => {
@@ -68,6 +71,45 @@ export default function PuckLineBoard() {
       if (res.ok) setBets((await res.json()).bets || [])
     } catch { /* bets section just stays as is */ }
   }, [token])
+  const findBet = (r: Row, market: string, side: string) =>
+    bets.find((b) => Number(b.game_id) === Number(r.game_id) && b.team === r.team && b.market === market && b.side === side)
+  /** One click = bet the posted line at the posted price (default units). Clicking a logged bet again asks to undo it. */
+  async function quick(r: Row, market: string, side: string, line: unknown, price: unknown) {
+    if (!token) return
+    const key = `${r.game_id}|${r.team}|${market}|${side}`
+    const existing = findBet(r, market, side)
+    if (existing) {
+      if (busy !== `undo:${key}`) { setBusy(`undo:${key}`); setToast('Click again to remove that bet.'); return }
+      setBusy(key)
+      await fetch(`/api/bets?id=${existing.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      setToast('Bet removed.'); setBusy(null); loadBets(); return
+    }
+    if (n(price) === null) return
+    setBusy(key)
+    try {
+      const res = await fetch('/api/bets', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          game_id: r.game_id, game_date: date, team: r.team, opponent: r.opponent, market, side,
+          line: market === 'moneyline' ? null : line, odds: price, stake: units,
+          model_basis: isBoth(r) ? 'both' : (pickModel(r) ?? 'manual'),
+          snapshot: { shots_line: r.shots_line, shots_delta_ha: r.shots_delta_ha, shots_delta_l10: r.shots_delta_l10, ml_odds: r.ml_odds,
+            ml_ev_ha: r.ml_ev_ha, ml_ev_l10: r.ml_ev_l10, x_goals_ha: r.x_goals_ha, x_goals_l10: r.x_goals_l10, x_saves_ha: r.x_saves_ha, x_saves_l10: r.x_saves_l10 },
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      setToast(res.ok ? `Logged: ${r.team_name || r.team} ${describe({ market, side, line: n(line) })} ${odds(price)} · ${units}u` : (j?.error || 'Could not log that bet.'))
+      if (res.ok) loadBets()
+    } catch { setToast('Could not log that bet. Check your connection.') } finally { setBusy(null) }
+  }
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t) }, [toast])
+  const Q = ({ r, market, side, line, price, label }: { r: Row; market: string; side: string; line: unknown; price: unknown; label: string }) => {
+    if (!token || n(price) === null) return null
+    const done = !!findBet(r, market, side), key = `${r.game_id}|${r.team}|${market}|${side}`
+    return <button type="button" className={`plb-q${done ? ' on' : ''}${busy === `undo:${key}` ? ' undo' : ''}`} disabled={busy === key}
+      title={done ? 'Logged. Click twice to remove.' : `Log ${label} at ${odds(price)} for ${units}u`}
+      onClick={() => quick(r, market, side, line, price)}>{done ? '✓ ' : ''}{label} {odds(price)}</button>
+  }
   useEffect(() => { load() }, [load])
   useEffect(() => { loadBets() }, [loadBets])
   useEffect(() => {
@@ -189,6 +231,8 @@ export default function PuckLineBoard() {
             <button aria-pressed={!playsOnly} onClick={() => setPlaysOnly(false)}>All games</button>
             <button aria-pressed={playsOnly} onClick={() => setPlaysOnly(true)}>Plays only</button>
           </div>
+          <label htmlFor="plb-units">Bet units <input id="plb-units" type="number" min={0.1} max={100} step={0.5} value={units}
+            onChange={(e) => { const v = Number(e.target.value) || 1; setUnits(v); saveNum('plb_units', v) }} /></label>
           <button className="plb-primary" onClick={load} disabled={loading}>Refresh</button>
         </div>
       </div>
@@ -200,6 +244,7 @@ export default function PuckLineBoard() {
       </div>
 
       {error && <div className="plb-note err">{error}</div>}
+      {toast && <div className="plb-toast" role="status">{toast}</div>}
       <div className="plb-legend">
         <span><span className="plb-pill under">−2.5</span> model under the line</span>
         <span><span className="plb-pill over">+2.5</span> model over the line</span>
@@ -230,10 +275,11 @@ export default function PuckLineBoard() {
             </div>
             <div className="plb-scroll"><table>
               <thead>
-                <tr><th></th><th className="grp sep" colSpan={8}>Shots on goal</th><th className="grp sep" colSpan={8}>Moneyline</th><th className="grp sep" colSpan={5}>Team goals</th></tr>
+                <tr><th></th><th className="grp sep" colSpan={8}>Shots on goal</th><th className="grp sep" colSpan={8}>Moneyline</th><th className="grp sep" colSpan={5}>Team goals</th><th className="grp sep" colSpan={3}>Saves</th></tr>
                 <tr><th>Team</th><th className="sep">Line</th><th>xS H/A</th><th>Δ H/A</th><th title="Historical win % of this H/A bucket (bets)">H/A bkt</th><th>xS L10</th><th>Δ L10</th><th title="Historical win % of this L10 bucket (bets)">L10 bkt</th><th>Actual</th>
                   <th className="sep">Bovada</th><th>xML H/A</th><th>EV H/A</th><th>xML L10</th><th>EV L10</th><th title="Shot model with the more reliable bucket for this game drives xG and moneyline">Best-bucket</th><th>EV best</th><th>Result</th>
-                  <th className="sep">Line</th><th>xG H/A</th><th>xG L10</th><th>xG best</th><th>Actual</th></tr>
+                  <th className="sep">Line</th><th>xG H/A</th><th>xG L10</th><th>xG best</th><th>Actual</th>
+                  <th className="sep">Line</th><th>xSv H/A</th><th>xSv L10</th></tr>
               </thead>
               <tbody>
                 {[a, h].map((r) => (
@@ -243,14 +289,16 @@ export default function PuckLineBoard() {
                       {bets.filter((b) => Number(b.game_id) === Number(r.game_id) && b.team === r.team).map((b) =>
                         <span key={b.id} className="plb-mybet" title="Logged bet">{describe(b)} {fmtOdds(b.odds)}</span>)}
                       {token && <button type="button" className="plb-logbtn" onClick={() => setBetFor(betFor === `${r.game_id}|${r.team}` ? null : `${r.game_id}|${r.team}`)}>
-                        {betFor === `${r.game_id}|${r.team}` ? 'Close' : '+ Log bet'}</button>}</td>
+                        {betFor === `${r.game_id}|${r.team}` ? 'Close' : 'Custom bet'}</button>}</td>
                     <td className="sep">{n(r.shots_line) === null ? <span className="plb-na">not posted</span> : <>{fmt(r.shots_line)}
-                      <div className="plb-move">o{odds(r.shots_over_odds)} u{odds(r.shots_under_odds)}</div>
+                      <div className="plb-qrow"><Q r={r} market="shots" side="over" line={r.shots_line} price={r.shots_over_odds} label="O" />
+                        <Q r={r} market="shots" side="under" line={r.shots_line} price={r.shots_under_odds} label="U" /></div>
+                      {!token && <div className="plb-move">o{odds(r.shots_over_odds)} u{odds(r.shots_under_odds)}</div>}
                       {n(r.shots_first) !== null && n(r.shots_first) !== n(r.shots_line) && <div className="plb-move">first {fmt(r.shots_first)}</div>}</>}</td>
                     <td>{fmt(r.x_shots_ha)}</td><td><Delta v={r.shots_delta_ha} /></td><td><Bkt model="ha" v={r.shots_delta_ha} orig={r.shots_delta_ha_excel} /></td>
                     <td>{fmt(r.x_shots_l10)}</td><td><Delta v={r.shots_delta_l10} /></td><td><Bkt model="l10" v={r.shots_delta_l10} orig={r.shots_delta_l10_excel} /></td>
                     <td>{n(r.actual_shots) === null ? '' : <>{r.actual_shots} <span className="plb-tag">{n(r.shots_line) === null ? '' : (n(r.actual_shots)! > n(r.shots_line)! ? 'over' : n(r.actual_shots)! < n(r.shots_line)! ? 'under' : 'push')}</span></>}</td>
-                    <td className="sep">{odds(r.ml_odds)}{n(r.ml_open) !== null && n(r.ml_open) !== n(r.ml_odds) && <div className="plb-move">open {odds(r.ml_open)}</div>}</td>
+                    <td className="sep">{token && n(r.ml_odds) !== null ? <Q r={r} market="moneyline" side="team" line={null} price={r.ml_odds} label="ML" /> : odds(r.ml_odds)}{n(r.ml_open) !== null && n(r.ml_open) !== n(r.ml_odds) && <div className="plb-move">open {odds(r.ml_open)}</div>}</td>
                     <td>{odds(r.ml_implied_ha)}</td><td><Ev v={r.ml_ev_ha} /></td>
                     <td>{odds(r.ml_implied_l10)}</td><td><Ev v={r.ml_ev_l10} /></td>
                     {(() => { const pm = pickModel(r); return pm === null ? <><td className="plb-na">—</td><td className="plb-na">—</td></> :
@@ -258,10 +306,16 @@ export default function PuckLineBoard() {
                         <td><Ev v={pm === 'l10' ? r.ml_ev_l10 : r.ml_ev_ha} /></td></> })()}
                     <td>{r.won === true ? <span className="plb-w">W</span> : r.won === false ? <span className="plb-l">L</span> : ''}</td>
                     <td className="sep">{n(r.team_goals_line) === null ? <span className="plb-na">—</span> : <>{fmt(r.team_goals_line)}
-                      <div className="plb-move">o{odds(r.team_goals_over_odds)} u{odds(r.team_goals_under_odds)}</div></>}</td>
+                      <div className="plb-qrow"><Q r={r} market="team_goals" side="over" line={r.team_goals_line} price={r.team_goals_over_odds} label="O" />
+                        <Q r={r} market="team_goals" side="under" line={r.team_goals_line} price={r.team_goals_under_odds} label="U" /></div>
+                      {!token && <div className="plb-move">o{odds(r.team_goals_over_odds)} u{odds(r.team_goals_under_odds)}</div>}</>}</td>
                     <td>{fmt(r.x_goals_ha, 2)}</td><td>{fmt(r.x_goals_l10, 2)}</td>
                     <td>{(() => { const pm = pickModel(r); return pm === null ? <span className="plb-na">—</span> : fmt(pm === 'l10' ? r.x_goals_l10 : r.x_goals_ha, 2) })()}</td>
                     <td>{n(r.actual_goals) === null ? '' : String(r.actual_goals)}</td>
+                    <td className="sep">{n(r.saves_line) === null ? <span className="plb-na" title="Bovada hasn't posted a saves line for this goalie">—</span> : <>{fmt(r.saves_line)}
+                      <div className="plb-qrow"><Q r={r} market="saves" side="over" line={r.saves_line} price={r.saves_over_odds} label="O" />
+                        <Q r={r} market="saves" side="under" line={r.saves_line} price={r.saves_under_odds} label="U" /></div></>}</td>
+                    <td>{fmt(r.x_saves_ha)}</td><td>{fmt(r.x_saves_l10)}</td>
                   </tr>))}
               </tbody>
             </table></div>
@@ -271,7 +325,9 @@ export default function PuckLineBoard() {
                 onSaved={() => { setBetFor(null); loadBets() }} onCancel={() => setBetFor(null)} />))}
             <div className="plb-foot">
               <span><span className="plb-lbl">Game total</span><b>{tot === null ? '—' : fmt(tot)}</b>{tot !== null && <span className="plb-move"> o{odds(a.game_total_over_odds)} u{odds(a.game_total_under_odds)}</span>}
-                {n(a.total_open) !== null && n(a.total_open) !== tot && <span className="plb-move"> open {fmt(a.total_open)}</span>}</span>
+                {n(a.total_open) !== null && n(a.total_open) !== tot && <span className="plb-move"> open {fmt(a.total_open)}</span>}
+                {tot !== null && <span className="plb-qrow inline"><Q r={a} market="game_total" side="over" line={a.game_total} price={a.game_total_over_odds} label="O" />
+                  <Q r={a} market="game_total" side="under" line={a.game_total} price={a.game_total_under_odds} label="U" /></span>}</span>
               <span><span className="plb-lbl">xTotal H/A</span><b>{fmt(a.x_game_total_ha, 2)}</b> {totPill(a.x_game_total_ha)}</span>
               <span><span className="plb-lbl">xTotal L10</span><b>{fmt(a.x_game_total_l10, 2)}</b> {totPill(a.x_game_total_l10)}</span>
               {final && <span><span className="plb-lbl">Actual</span><b>{String(a.actual_game_goals)}</b></span>}
