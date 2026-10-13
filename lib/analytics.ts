@@ -34,6 +34,7 @@ export interface ThresholdRow {
   confidence: number | null // Wilson 95% lower bound on win %
   units: number
   roi: number | null
+  breakeven: number // average break-even win % at the prices bet (52.4% at -110)
 }
 
 export const profit = (odds: number) => (odds < 0 ? 100 / -odds : odds / 100)
@@ -49,13 +50,14 @@ export function wilsonLower(wins: number, n: number): number | null {
 type Pick = { win: boolean | null; odds: number }
 
 function summarize(label: string, threshold: number, picks: Pick[]): ThresholdRow {
-  let wins = 0, losses = 0, pushes = 0, units = 0
+  let wins = 0, losses = 0, pushes = 0, units = 0, be = 0
   for (const p of picks) {
     if (p.win === null) { pushes++; continue }
+    be += breakeven(p.odds)
     if (p.win) { wins++; units += profit(p.odds) } else { losses++; units -= 1 }
   }
   const n = wins + losses
-  return { label, threshold, bets: n, wins, losses, pushes, winPct: n ? wins / n : null, confidence: wilsonLower(wins, n), units, roi: n ? units / n : null }
+  return { label, threshold, bets: n, wins, losses, pushes, winPct: n ? wins / n : null, confidence: wilsonLower(wins, n), units, roi: n ? units / n : null, breakeven: n ? be / n : breakeven(-110) }
 }
 
 /** Over/under grading of one number against a line. */
@@ -205,5 +207,29 @@ export function fillHistoryTotals(games: Game[], raw: Raw[]): Game[] {
     if (g.source === 'live') return g
     const gl = goals.get(g.gameKey)
     return gl && gl.length === 2 ? { ...g, total: { ...g.total, actual: gl[0] + gl[1] } } : g
+  })
+}
+
+/** Moneyline by price: how big a favorite / underdog the team was at the posted odds. */
+export const FAV_BUCKETS: [number, number][] = [[-120, -100], [-140, -121], [-160, -141], [-200, -161], [-250, -201], [-10000, -251]]
+export const DOG_BUCKETS: [number, number][] = [[100, 120], [121, 140], [141, 160], [161, 200], [201, 250], [251, 10000]]
+export function priceLabel([lo, hi]: [number, number]): string {
+  if (lo <= -10000) return `${hi} or shorter`
+  if (hi >= 10000) return `+${lo} or longer`
+  return lo < 0 ? `${hi} to ${lo}` : `+${lo} to +${hi}`
+}
+/** minEv: null = every team (no model filter), otherwise only teams the model rated at EV >= minEv %. */
+export function mlPriceBuckets(games: Game[], model: Model, minEv: number | null, side: 'favorite' | 'underdog'): ThresholdRow[] {
+  const buckets = side === 'favorite' ? FAV_BUCKETS : DOG_BUCKETS
+  return buckets.map((b, i) => {
+    const [lo, hi] = b
+    const picks: Pick[] = []
+    for (const g of games) {
+      const o = g.ml.odds, ev = g.ml.ev[model]
+      if (o === null || g.ml.won === null || o < lo || o > hi) continue
+      if (minEv !== null && (ev === null || ev < minEv / 100)) continue
+      picks.push({ win: g.ml.won, odds: o })
+    }
+    return summarize(priceLabel(b), i, picks)
   })
 }

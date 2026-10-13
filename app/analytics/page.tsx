@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import {
   MODELS, type Model, type Game, type ThresholdRow, breakeven,
-  fromHistory, fromLive, fillHistoryTotals, ouThresholds, mlThresholds, goalsVsLeague, savesAccuracy,
+  fromHistory, fromLive, fillHistoryTotals, ouThresholds, mlThresholds, mlPriceBuckets, goalsVsLeague, savesAccuracy,
 } from '@/lib/analytics'
 import './analytics.css'
 
@@ -23,19 +23,19 @@ const BE = breakeven(-110)
 const pct = (v: number | null, d = 1) => (v === null ? '—' : (100 * v).toFixed(d) + '%')
 const sgn = (v: number | null, d = 2) => (v === null ? '—' : (v > 0 ? '+' : '') + v.toFixed(d))
 
-function ThresholdTable({ title, model, rows, note }: { title: string; model: Model; rows: ThresholdRow[]; note?: string }) {
+function ThresholdTable({ title, model, rows, note, firstCol = 'Threshold' }: { title: string; model: Model; rows: ThresholdRow[]; note?: string; firstCol?: string }) {
   return (
     <section className="pla-card">
       <h3><span><span className={`pla-model ${model}`}>{model === 'l10' ? 'L10' : 'H/A'}</span>{title}</span></h3>
       <div className="pla-scroll"><table>
-        <thead><tr><th>Threshold</th><th>Bets</th><th>W–L</th><th>Win %</th><th>Conf. 95%</th><th>Units</th><th>ROI</th></tr></thead>
+        <thead><tr><th>{firstCol}</th><th>Bets</th><th>W–L</th><th>Win %</th><th>Conf. 95%</th><th>Units</th><th>ROI</th></tr></thead>
         <tbody>{rows.map((r) => {
-          const cls = r.bets === 0 ? 'empty' : r.confidence !== null && r.confidence >= BE ? 'good' : r.winPct !== null && r.winPct >= 0.58 ? 'ok' : ''
+          const cls = r.bets === 0 ? 'empty' : r.confidence !== null && r.confidence >= r.breakeven ? 'good' : r.winPct !== null && r.winPct >= 0.58 ? 'ok' : ''
           return (
             <tr key={r.label} className={cls}>
               <td>{r.label}</td><td>{r.bets}</td><td>{r.wins}–{r.losses}{r.pushes ? `–${r.pushes}` : ''}</td>
               <td className="bar"><div className="pla-barwrap">{pct(r.winPct)}
-                <span className="pla-bar" aria-hidden="true"><i style={{ width: `${(r.winPct ?? 0) * 100}%` }} /><b style={{ left: `${BE * 100}%` }} /></span></div></td>
+                <span className="pla-bar" aria-hidden="true"><i style={{ width: `${(r.winPct ?? 0) * 100}%` }} /><b style={{ left: `${r.breakeven * 100}%` }} /></span></div></td>
               <td>{pct(r.confidence)}</td>
               <td className={r.units > 0 ? 'pos' : r.units < 0 ? 'neg' : ''}>{r.bets ? sgn(r.units) : '—'}</td>
               <td className={r.roi !== null && r.roi > 0 ? 'pos' : r.roi !== null && r.roi < 0 ? 'neg' : ''}>{r.roi === null ? '—' : sgn(r.roi * 100, 1) + '%'}</td>
@@ -58,6 +58,7 @@ export default function AnalyticsPage() {
   const [venue, setVenue] = useState<'all' | 'home' | 'away'>('all')
   const [mode, setMode] = useState<'cumulative' | 'bucket'>('cumulative')
   const [saveLine, setSaveLine] = useState<'real' | 'standin'>('real')
+  const [priceEv, setPriceEv] = useState<number | null>(0)
 
   useEffect(() => {
     try { const t = localStorage.getItem('pla_tab'); if (t && TABS.some((x) => x.key === t)) setTab(t as Tab) } catch { /* ignore */ }
@@ -142,7 +143,7 @@ export default function AnalyticsPage() {
             <div className="pla-stat"><b>{counts.first ? `${counts.first.slice(5)}/${counts.first.slice(2, 4)}` : '—'} → {counts.last ? `${counts.last.slice(5)}/${counts.last.slice(2, 4)}` : '—'}</b><small>date range</small></div>
           </div>
           <div className="pla-legend">
-            <span><i className="pla-sw" style={{ background: 'rgba(34,197,94,.35)' }} />95% confidence clears break-even ({pct(BE)} at −110)</span>
+            <span><i className="pla-sw" style={{ background: 'rgba(34,197,94,.35)' }} />95% confidence clears break-even at the prices bet ({pct(BE)} at −110)</span>
             <span><i className="pla-sw" style={{ background: 'rgba(34,197,94,.14)' }} />Win % 58% or better</span>
             <span>White tick on each bar = break-even</span>
             <span>Units: flat 1u at the posted price (−110 when no price was recorded)</span>
@@ -159,6 +160,19 @@ export default function AnalyticsPage() {
           {tab === 'moneyline' && (
             <>
               <div className="pla-note">Before October 2026 the workbook made one moneyline number, from its own goals model, so those games appear under H/A only. From October 2026 on, both models price every game.</div>
+              <div className="pla-filters">
+                <div className="grp"><span className="lbl">By price · include</span>
+                  {([[null, 'Every team'], [0, 'Model EV ≥ 0%'], [5, 'EV ≥ 5%'], [10, 'EV ≥ 10%']] as const).map(([k, l]) =>
+                    <button key={String(k)} className="pla-chip" aria-pressed={priceEv === k} onClick={() => setPriceEv(k)}>{l}</button>)}
+                </div>
+              </div>
+              {(['favorite', 'underdog'] as const).map((side) => (
+                <div className="pla-grid" key={'price' + side}>
+                  {MODELS.map((m) => <ThresholdTable key={m.key} model={m.key}
+                    title={side === 'favorite' ? 'Favorites by price' : 'Underdogs by price'}
+                    rows={mlPriceBuckets(filtered, m.key, priceEv, side)} firstCol="Posted price"
+                    note={priceEv === null ? 'Every team at that price, model or not: the market baseline. Both tables match in this view.' : `Only teams the model rated at EV ≥ ${priceEv}%, grouped by the posted price.`} />)}
+                </div>))}
               {(['all', 'favorite', 'underdog'] as const).map((side) => (
                 <div className="pla-grid" key={side}>
                   {MODELS.map((m) => <ThresholdTable key={m.key} model={m.key}
