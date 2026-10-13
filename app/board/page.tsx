@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { bandOf, bandLabel, type BucketStats } from '@/lib/shotBuckets'
 import './board.css'
 
 type Row = Record<string, string | number | boolean | null>
@@ -28,8 +29,11 @@ export default function PuckLineBoard() {
   const [thr, setThr] = useState(2)
   const [evThr, setEvThr] = useState(5)
   const [playsOnly, setPlaysOnly] = useState(false)
+  const [buckets, setBuckets] = useState<BucketStats>({})
+  const [bktThr, setBktThr] = useState(55)
+  const [minN, setMinN] = useState(20)
 
-  useEffect(() => { setThr(readNum('plb_thr', 2)); setEvThr(readNum('plb_ev', 5)) }, [])
+  useEffect(() => { setThr(readNum('plb_thr', 2)); setEvThr(readNum('plb_ev', 5)); setBktThr(readNum('plb_bkt', 55)); setMinN(readNum('plb_minn', 20)) }, [])
 
   useEffect(() => {
     (async () => {
@@ -48,7 +52,7 @@ export default function PuckLineBoard() {
       if (res.status === 401) { router.replace('/login?redirect=/board'); return }
       const json = await res.json()
       if (!res.ok) { setError(json?.error || 'Could not load the board.'); return }
-      setRows(json.rows || []); setHist(json.history || []); setError(null)
+      setRows(json.rows || []); setHist(json.history || []); setBuckets(json.buckets || {}); setError(null)
       setUpdated(new Date(json.loadedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
     } catch { setError('Could not load the board. Check your connection and press Refresh.') }
     finally { setLoading(false) }
@@ -61,6 +65,25 @@ export default function PuckLineBoard() {
   }, [load, date])
 
   const isShotPlay = (r: Row) => thr > 0 && [r.shots_delta_ha, r.shots_delta_l10].some((d) => n(d) !== null && Math.abs(n(d) as number) >= thr)
+  // Buckets are looked up on the original-formula delta (what the bucket history was graded on); falls back to the shown delta.
+  const bucketOf = (model: 'l10' | 'ha', v: unknown, orig?: unknown) => {
+    const d = n(orig) ?? n(v); if (d === null || d === 0) return null
+    const side = d < 0 ? 'under' : 'over', band = bandOf(d), st = buckets[`${model}|${side}|${band}`] || { w: 0, l: 0 }
+    const total = st.w + st.l
+    return { side, band, total, pct: total ? st.w / total : null, label: bandLabel(band, side) }
+  }
+  const wilson = (w: number, t: number) => { if (!t) return -1; const z = 1.96, p = w / t
+    return (p + z * z / (2 * t) - z * Math.sqrt((p * (1 - p) + z * z / (4 * t)) / t)) / (1 + z * z / t) }
+  /** Which shot model this team-game's goals/moneyline should come from: the one whose bucket has the higher 95%-confidence win rate. */
+  const pickModel = (r: Row): 'l10' | 'ha' | null => {
+    const a = bucketOf('l10', r.shots_delta_l10, r.shots_delta_l10_excel), b = bucketOf('ha', r.shots_delta_ha, r.shots_delta_ha_excel)
+    const ca = a && a.total ? wilson((a.pct ?? 0) * a.total, a.total) : -1, cb = b && b.total ? wilson((b.pct ?? 0) * b.total, b.total) : -1
+    if (ca < 0 && cb < 0) return null
+    return ca >= cb ? 'l10' : 'ha'
+  }
+  const qualifies = (b: ReturnType<typeof bucketOf>) => !!b && b.total >= minN && b.pct !== null && b.pct * 100 >= bktThr
+  const isBoth = (r: Row) => { const a = bucketOf('l10', r.shots_delta_l10, r.shots_delta_l10_excel), b = bucketOf('ha', r.shots_delta_ha, r.shots_delta_ha_excel)
+    return !!a && !!b && a.side === b.side && qualifies(a) && qualifies(b) }
   const isMlPlay = (r: Row) => [r.ml_ev_ha, r.ml_ev_l10].some((e) => n(e) !== null && (n(e) as number) >= evThr / 100)
 
   const games = useMemo(() => {
@@ -74,6 +97,12 @@ export default function PuckLineBoard() {
   const Delta = ({ v }: { v: unknown }) => {
     const d = n(v); if (d === null) return <span className="plb-na">—</span>
     return <span className={`plb-pill ${d < 0 ? 'under' : 'over'}${thr > 0 && Math.abs(d) >= thr ? ' hit' : ''}`}>{sgn(d)}</span>
+  }
+  const Bkt = ({ model, v, orig }: { model: 'l10' | 'ha'; v: unknown; orig?: unknown }) => {
+    const b = bucketOf(model, v, orig); if (!b) return <span className="plb-na">—</span>
+    if (!b.total) return <span className="plb-na" title={`No history in the ${b.label} bucket`}>new</span>
+    return <span className={`plb-bkt${qualifies(b) ? ' hit' : ''}`} title={`${b.label} ${b.side}s: ${Math.round((b.pct ?? 0) * b.total)}-${b.total - Math.round((b.pct ?? 0) * b.total)} historically`}>
+      {((b.pct ?? 0) * 100).toFixed(0)}%<small> {b.total}</small></span>
   }
   const Ev = ({ v }: { v: unknown }) => {
     const e = n(v); if (e === null) return <span className="plb-na">—</span>
@@ -98,7 +127,8 @@ export default function PuckLineBoard() {
         const g = ou(r.actual_shots, r.shots_line, d, r.shots_over_odds, r.shots_under_odds)
         if (g) add(d < 0 ? 'Shots under' : 'Shots over', model, g.win, g.units)
       }
-      for (const [model, e] of [['H/A', n(r.ml_ev_ha)], ['L10', n(r.ml_ev_l10)]] as const) {
+      const pm = pickModel(r)
+      for (const [model, e] of [['H/A', n(r.ml_ev_ha)], ['L10', n(r.ml_ev_l10)], ['Best bucket', pm === null ? null : n(pm === 'l10' ? r.ml_ev_l10 : r.ml_ev_ha)]] as const) {
         const o = n(r.ml_odds); if (e === null || o === null || r.won === null || e < evThr / 100) continue
         add('Moneyline', model, r.won === true, r.won === true ? profit(o) : -1)
       }
@@ -119,7 +149,8 @@ export default function PuckLineBoard() {
     }
     const order = ['Shots under', 'Shots over', 'Moneyline', 'Team goals', 'Game total']
     return Object.values(acc).sort((a, b) => order.indexOf(a.market) - order.indexOf(b.market) || a.model.localeCompare(b.model))
-  }, [hist, thr, evThr])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hist, thr, evThr, buckets])
 
   const posted = rows.filter((r) => n(r.shots_line) !== null).length
   const graded = rows.filter((r) => n(r.actual_shots) !== null).length
@@ -139,6 +170,10 @@ export default function PuckLineBoard() {
             onChange={(e) => { const v = Number(e.target.value) || 0; setThr(v); saveNum('plb_thr', v) }} /></label>
           <label htmlFor="plb-ev">ML EV ≥ <input id="plb-ev" type="number" min={0} max={50} step={1} value={evThr}
             onChange={(e) => { const v = Number(e.target.value) || 0; setEvThr(v); saveNum('plb_ev', v) }} />%</label>
+          <label htmlFor="plb-bkt">Bucket win ≥ <input id="plb-bkt" type="number" min={50} max={80} step={1} value={bktThr}
+            onChange={(e) => { const v = Number(e.target.value) || 0; setBktThr(v); saveNum('plb_bkt', v) }} />%</label>
+          <label htmlFor="plb-minn">min bets <input id="plb-minn" type="number" min={0} max={500} step={5} value={minN}
+            onChange={(e) => { const v = Number(e.target.value) || 0; setMinN(v); saveNum('plb_minn', v) }} /></label>
           <div className="plb-seg" role="group" aria-label="Show">
             <button aria-pressed={!playsOnly} onClick={() => setPlaysOnly(false)}>All games</button>
             <button aria-pressed={playsOnly} onClick={() => setPlaysOnly(true)}>Plays only</button>
@@ -148,7 +183,7 @@ export default function PuckLineBoard() {
       </div>
 
       <div className="plb-chips">
-        {[[games.length, 'games'], [rows.filter(isShotPlay).length, 'shot plays'], [rows.filter(isMlPlay).length, 'moneyline plays'],
+        {[[games.length, 'games'], [rows.filter(isBoth).length, 'both-model plays'], [rows.filter(isShotPlay).length, 'shot plays'], [rows.filter(isMlPlay).length, 'moneyline plays'],
           [`${posted}/${rows.length}`, 'shot lines posted'], [graded ? `${graded / 2} final` : '—', 'results']].map(([b, s]) => (
           <div className="plb-chip" key={String(s)}><b>{b}</b><small>{s}</small></div>))}
       </div>
@@ -159,13 +194,14 @@ export default function PuckLineBoard() {
         <span><span className="plb-pill over">+2.5</span> model over the line</span>
         <span><span className="plb-pill under hit">−3.0</span> outlined = meets your edge</span>
         <span><span className="plb-ev pos hit">+8%</span> moneyline EV meets your threshold</span>
+        <span><span className="plb-tag both">Both models under</span> each model&apos;s own bucket clears your win % on the same side</span>
         <span>H/A and L10 are separate models, never blended</span>
       </div>
 
       {!loading && !error && rows.length === 0 && <div className="plb-note">No projections for this date yet. They&apos;re built at 7:00am ET each game day.</div>}
 
       {games.map((g) => {
-        const hasPlay = g.some((r) => isShotPlay(r) || isMlPlay(r))
+        const hasPlay = g.some((r) => isBoth(r) || isShotPlay(r) || isMlPlay(r))
         if (playsOnly && !hasPlay) return null
         const a = g.find((r) => r.home_away === 'away') || g[0], h = g.find((r) => r.home_away === 'home') || g[g.length - 1]
         const iso = a.start_time_utc ? String(a.start_time_utc).replace(' ', 'T').replace(/([+-]\d\d)$/, '$1:00') : null
@@ -183,28 +219,33 @@ export default function PuckLineBoard() {
             </div>
             <div className="plb-scroll"><table>
               <thead>
-                <tr><th></th><th className="grp sep" colSpan={6}>Shots on goal</th><th className="grp sep" colSpan={6}>Moneyline</th><th className="grp sep" colSpan={4}>Team goals</th></tr>
-                <tr><th>Team</th><th className="sep">Line</th><th>xS H/A</th><th>Δ H/A</th><th>xS L10</th><th>Δ L10</th><th>Actual</th>
-                  <th className="sep">Bovada</th><th>xML H/A</th><th>EV H/A</th><th>xML L10</th><th>EV L10</th><th>Result</th>
-                  <th className="sep">Line</th><th>xG H/A</th><th>xG L10</th><th>Actual</th></tr>
+                <tr><th></th><th className="grp sep" colSpan={8}>Shots on goal</th><th className="grp sep" colSpan={8}>Moneyline</th><th className="grp sep" colSpan={5}>Team goals</th></tr>
+                <tr><th>Team</th><th className="sep">Line</th><th>xS H/A</th><th>Δ H/A</th><th title="Historical win % of this H/A bucket (bets)">H/A bkt</th><th>xS L10</th><th>Δ L10</th><th title="Historical win % of this L10 bucket (bets)">L10 bkt</th><th>Actual</th>
+                  <th className="sep">Bovada</th><th>xML H/A</th><th>EV H/A</th><th>xML L10</th><th>EV L10</th><th title="Shot model with the more reliable bucket for this game drives xG and moneyline">Best-bucket</th><th>EV best</th><th>Result</th>
+                  <th className="sep">Line</th><th>xG H/A</th><th>xG L10</th><th>xG best</th><th>Actual</th></tr>
               </thead>
               <tbody>
                 {[a, h].map((r) => (
-                  <tr key={String(r.team)}>
-                    <td className="team">{r.team_name}<small>{r.home_away}</small>{r.b2b ? <> <span className="plb-tag b2b">B2B</span></> : null}</td>
+                  <tr key={String(r.team)} className={isBoth(r) ? 'both' : ''}>
+                    <td className="team">{r.team_name}<small>{r.home_away}</small>{r.b2b ? <> <span className="plb-tag b2b">B2B</span></> : null}
+                      {isBoth(r) ? <> <span className="plb-tag both">Both models {n(r.shots_delta_ha)! < 0 ? 'under' : 'over'}</span></> : null}</td>
                     <td className="sep">{n(r.shots_line) === null ? <span className="plb-na">not posted</span> : <>{fmt(r.shots_line)}
                       <div className="plb-move">o{odds(r.shots_over_odds)} u{odds(r.shots_under_odds)}</div>
                       {n(r.shots_first) !== null && n(r.shots_first) !== n(r.shots_line) && <div className="plb-move">first {fmt(r.shots_first)}</div>}</>}</td>
-                    <td>{fmt(r.x_shots_ha)}</td><td><Delta v={r.shots_delta_ha} /></td>
-                    <td>{fmt(r.x_shots_l10)}</td><td><Delta v={r.shots_delta_l10} /></td>
+                    <td>{fmt(r.x_shots_ha)}</td><td><Delta v={r.shots_delta_ha} /></td><td><Bkt model="ha" v={r.shots_delta_ha} orig={r.shots_delta_ha_excel} /></td>
+                    <td>{fmt(r.x_shots_l10)}</td><td><Delta v={r.shots_delta_l10} /></td><td><Bkt model="l10" v={r.shots_delta_l10} orig={r.shots_delta_l10_excel} /></td>
                     <td>{n(r.actual_shots) === null ? '' : <>{r.actual_shots} <span className="plb-tag">{n(r.shots_line) === null ? '' : (n(r.actual_shots)! > n(r.shots_line)! ? 'over' : n(r.actual_shots)! < n(r.shots_line)! ? 'under' : 'push')}</span></>}</td>
                     <td className="sep">{odds(r.ml_odds)}{n(r.ml_open) !== null && n(r.ml_open) !== n(r.ml_odds) && <div className="plb-move">open {odds(r.ml_open)}</div>}</td>
                     <td>{odds(r.ml_implied_ha)}</td><td><Ev v={r.ml_ev_ha} /></td>
                     <td>{odds(r.ml_implied_l10)}</td><td><Ev v={r.ml_ev_l10} /></td>
+                    {(() => { const pm = pickModel(r); return pm === null ? <><td className="plb-na">—</td><td className="plb-na">—</td></> :
+                      <><td><span className={`plb-tag ${pm}`}>{pm === 'l10' ? 'L10' : 'H/A'}</span> {odds(pm === 'l10' ? r.ml_implied_l10 : r.ml_implied_ha)}</td>
+                        <td><Ev v={pm === 'l10' ? r.ml_ev_l10 : r.ml_ev_ha} /></td></> })()}
                     <td>{r.won === true ? <span className="plb-w">W</span> : r.won === false ? <span className="plb-l">L</span> : ''}</td>
                     <td className="sep">{n(r.team_goals_line) === null ? <span className="plb-na">—</span> : <>{fmt(r.team_goals_line)}
                       <div className="plb-move">o{odds(r.team_goals_over_odds)} u{odds(r.team_goals_under_odds)}</div></>}</td>
                     <td>{fmt(r.x_goals_ha, 2)}</td><td>{fmt(r.x_goals_l10, 2)}</td>
+                    <td>{(() => { const pm = pickModel(r); return pm === null ? <span className="plb-na">—</span> : fmt(pm === 'l10' ? r.x_goals_l10 : r.x_goals_ha, 2) })()}</td>
                     <td>{n(r.actual_goals) === null ? '' : String(r.actual_goals)}</td>
                   </tr>))}
               </tbody>

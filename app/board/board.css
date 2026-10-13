@@ -52,3 +52,11 @@
 .plb-lbl { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; color: var(--plb-muted); margin-right: 4px }
 .plb-ledger h3 { font-size: 1.1rem; font-weight: 700; color: #fff; margin: 0 0 6px }
 .plb-card { background: var(--card); border: 1px solid var(--plb-line); border-radius: 12px }
+
+.plb tr.both td { background: rgba(34,197,94,.10) }
+.plb tr.both td:first-child { box-shadow: inset 3px 0 0 var(--win) }
+.plb-tag.both { background: var(--win); color: #052e16 }
+.plb-bkt { color: var(--ice) } .plb-bkt small { color: var(--plb-muted); font-size: .7rem }
+.plb-bkt.hit { color: var(--win); font-weight: 700 }
+.plb-tag.l10 { background: rgba(167,139,250,.18); color: #c4b5fd }
+.plb-tag.ha { background: rgba(56,189,248,.18); color: #7dd3fc }
