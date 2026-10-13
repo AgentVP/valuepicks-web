@@ -30,7 +30,7 @@ export default function RootLayout({
         <header className="border-b border-[var(--card-border)] bg-[var(--card)]/80 backdrop-blur-sm sticky top-0 z-10">
           <Navbar />
         </header>
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 page-gradient min-h-[60vh] pb-16">
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 page-gradient min-h-[60vh] pb-24">
           {children}
         </main>
         <ScoreboardTicker />

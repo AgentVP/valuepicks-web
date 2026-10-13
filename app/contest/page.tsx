@@ -243,8 +243,8 @@ export default function ContestPage() {
                   <span className="ml-2 text-[var(--live)] font-medium">Locked</span>
                 )}
               </div>
-              <div className="p-4 flex gap-3 flex-wrap items-stretch sm:items-center">
-                <div className="flex gap-3 flex-1 min-w-0">
+              <div className="p-3 sm:p-4 flex gap-3 flex-wrap items-stretch sm:items-center">
+                <div className="flex gap-2 sm:gap-3 flex-1 min-w-0">
                   {[
                     { team: game.away_team, american: odds?.away_american },
                     { team: game.home_team, american: odds?.home_american },
@@ -256,7 +256,7 @@ export default function ContestPage() {
                         type="button"
                         disabled={locked}
                         onClick={() => setPick(game.id, team, locked)}
-                        className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 py-3 px-4 rounded-lg font-semibold transition-all min-w-0 ${
+                        className={`flex-1 flex flex-row items-center justify-center gap-2 py-3 px-3 sm:px-4 min-h-[52px] rounded-lg font-semibold transition-all min-w-0 ${
                           locked
                             ? 'cursor-not-allowed opacity-60'
                             : 'cursor-pointer'
@@ -269,8 +269,8 @@ export default function ContestPage() {
                         <img
                           src={logo(team)}
                           alt=""
-                          width={32}
-                          height={32}
+                          width={28}
+                          height={28}
                           className="shrink-0"
                         />
                         <span>{team}</span>
@@ -306,17 +306,18 @@ export default function ContestPage() {
         </p>
       )}
 
-      <div className="mt-8 flex flex-col sm:flex-row gap-4 items-start">
+      {/* Stays on screen while scrolling the slate (sits just above the live-score ticker on phones). */}
+      <div className="sticky bottom-16 z-10 mt-6 -mx-4 sm:mx-0 px-4 sm:px-0 py-3 bg-[var(--background)]/90 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-none flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-center">
         <button
           type="button"
           onClick={submitPicks}
           disabled={isSubmitting}
-          className="px-6 py-3 rounded-xl bg-[var(--accent)] text-[var(--background)] font-bold text-lg hover:bg-[var(--accent-dim)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[var(--accent)] text-[var(--background)] font-bold text-lg hover:bg-[var(--accent-dim)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.35)]"
         >
-          {isSubmitting ? 'Saving…' : 'Submit Picks'}
+          {isSubmitting ? 'Saving…' : `Submit Picks · ${Object.keys(picks).length}/${games.length}`}
         </button>
         {message && (
-          <p className="text-[var(--ice)] font-medium mt-1 sm:mt-0">{message}</p>
+          <p className="text-[var(--ice)] font-medium text-center sm:text-left">{message}</p>
         )}
       </div>
     </div>
