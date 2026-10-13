@@ -15,15 +15,15 @@ const SLATE_COLS = [
   'shots_line', 'shots_over_odds', 'shots_under_odds', 'x_shots_ha', 'x_shots_l10', 'shots_delta_ha', 'shots_delta_l10', 'shots_delta_ha_excel', 'shots_delta_l10_excel',
   'team_goals_line', 'team_goals_over_odds', 'team_goals_under_odds', 'x_goals_ha', 'x_goals_l10',
   'game_total', 'game_total_over_odds', 'game_total_under_odds', 'x_game_total_ha', 'x_game_total_l10', 'x_saves_ha', 'x_saves_l10',
-  'ml_odds', 'ml_implied_ha', 'ml_implied_l10', 'ml_ev_ha', 'ml_ev_l10', 'puck_line', 'puck_line_odds', 'saves_line', 'saves_over_odds', 'saves_under_odds',
-  'actual_shots', 'actual_goals', 'actual_game_goals', 'won',
+  'ml_odds', 'ml_implied_ha', 'ml_implied_l10', 'ml_ev_ha', 'ml_ev_l10', 'puck_line', 'puck_line_odds', 'goalie', 'saves_line', 'saves_over_odds', 'saves_under_odds',
+  'actual_shots', 'actual_goals', 'actual_game_goals', 'actual_saves', 'won',
 ].join(',')
 const MOVE_COLS = 'game_id,team,shots_first,shots_move,ml_open,ml_prob_move,total_open,total_move,last_snapshot'
 const HIST_COLS = [
   'game_date', 'game_id', 'team', 'shots_line', 'shots_over_odds', 'shots_under_odds', 'shots_delta_ha', 'shots_delta_l10', 'shots_delta_ha_excel', 'shots_delta_l10_excel', 'actual_shots',
   'team_goals_line', 'team_goals_over_odds', 'team_goals_under_odds', 'x_goals_ha', 'x_goals_l10', 'actual_goals',
   'game_total', 'game_total_over_odds', 'game_total_under_odds', 'x_game_total_ha', 'x_game_total_l10', 'actual_game_goals',
-  'ml_odds', 'ml_ev_ha', 'ml_ev_l10', 'won',
+  'ml_odds', 'ml_ev_ha', 'ml_ev_l10', 'won', 'home_away', 'saves_line', 'saves_over_odds', 'saves_under_odds', 'actual_saves',
 ].join(',')
 
 async function hockey(path: string) {
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
       hockey(`daily_projections?select=game_id,team,start_time_utc&game_date=eq.${date}`),
       hockey(`line_movement?select=${MOVE_COLS}&game_date=eq.${date}`),
       hockey(`model_vs_lines?select=${HIST_COLS}&actual_shots=not.is.null&order=game_date`),
-      hockeyAll('team_games?select=l10_delta,ha_delta,shot_line,actual_shots&actual_shots=not.is.null&shot_line=not.is.null'),
+      hockeyAll('team_games?select=game_date,game_key,team,l10_delta,ha_delta,shot_line,actual_shots&actual_shots=not.is.null&shot_line=not.is.null'),
     ])
     // Bucket win rates: every graded game before this date. History was graded on the workbook's original shot formula,
     // so live games are bucketed on the same original-formula deltas (*_excel) to compare like with like.
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
       .map((r: { game_id: number; team: string }) => ({ ...r, ...(moveMap.get(key(r)) || {}), start_time_utc: startMap.get(key(r)) || null }))
       .sort((a: { start_time_utc: string | null; game_id: number; home_away: string }, b: { start_time_utc: string | null; game_id: number; home_away: string }) =>
         String(a.start_time_utc).localeCompare(String(b.start_time_utc)) || a.game_id - b.game_id || (a.home_away === 'away' ? -1 : 1))
-    return NextResponse.json({ rows, history, buckets, loadedAt: new Date().toISOString() })
+    return NextResponse.json({ rows, history, past, buckets, loadedAt: new Date().toISOString() })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'error'
     const status = msg === 'not_configured' ? 503 : 502

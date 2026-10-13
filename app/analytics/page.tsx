@@ -7,11 +7,13 @@ import {
   MODELS, type Model, type Game, type ThresholdRow, breakeven,
   fromHistory, fromLive, fillHistoryTotals, ouThresholds, mlThresholds, mlPriceBuckets, goalsVsLeague, savesAccuracy,
 } from '@/lib/analytics'
+import { teamGamesFromHistory, teamGamesFromLive, type TeamGame } from '@/lib/linkedBets'
+import BucketPlays from './bucketPlays'
 import './analytics.css'
 
-type Tab = 'shots' | 'moneyline' | 'totals' | 'saves'
+type Tab = 'buckets' | 'shots' | 'moneyline' | 'totals' | 'saves'
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'shots', label: 'Shots' }, { key: 'moneyline', label: 'Moneyline' }, { key: 'totals', label: 'Goal totals' }, { key: 'saves', label: 'Saves' },
+  { key: 'buckets', label: 'Bucket plays' }, { key: 'shots', label: 'Shots' }, { key: 'moneyline', label: 'Moneyline' }, { key: 'totals', label: 'Goal totals' }, { key: 'saves', label: 'Saves' },
 ]
 const SHOT_STEPS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6]
 const SAVE_STEPS = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5]
@@ -52,13 +54,14 @@ export default function AnalyticsPage() {
   const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('shots')
+  const [tab, setTab] = useState<Tab>('buckets')
   const [seasons, setSeasons] = useState<string[]>([])
   const [population, setPopulation] = useState<'all' | 'every' | 'picks'>('all')
   const [venue, setVenue] = useState<'all' | 'home' | 'away'>('all')
   const [mode, setMode] = useState<'cumulative' | 'bucket'>('cumulative')
   const [saveLine, setSaveLine] = useState<'real' | 'standin'>('real')
   const [priceEv, setPriceEv] = useState<number | null>(0)
+  const [teamGames, setTeamGames] = useState<TeamGame[]>([])
 
   useEffect(() => {
     try { const t = localStorage.getItem('pla_tab'); if (t && TABS.some((x) => x.key === t)) setTab(t as Tab) } catch { /* ignore */ }
@@ -74,6 +77,7 @@ export default function AnalyticsPage() {
         if (!res.ok) { setError(json?.error || 'Could not load analytics.'); return }
         const all = [...fillHistoryTotals(fromHistory(json.history || []), json.history || []), ...fromLive(json.live || [])]
         setGames(all)
+        setTeamGames([...teamGamesFromHistory(json.history || []), ...teamGamesFromLive(json.live || [])])
         setSeasons([...new Set(all.map((g) => g.season))].sort())
       } catch { setError('Could not load analytics. Check your connection and reload.') }
       finally { setLoading(false) }
@@ -85,6 +89,11 @@ export default function AnalyticsPage() {
     seasons.includes(g.season) &&
     (population === 'all' || (population === 'every' ? g.source !== 'history-picks' : g.source === 'history-picks' || g.loggedResult !== null)) &&
     (venue === 'all' || g.homeAway === venue)), [games, seasons, population, venue])
+
+  const includeTG = useMemo(() => (t: TeamGame) => {
+    const [y, mo] = t.date.split('-').map(Number), s0 = mo >= 7 ? y : y - 1
+    return seasons.includes(`${s0}-${String(s0 + 1).slice(2)}`) && (venue === 'all' || t.homeAway === venue)
+  }, [seasons, venue])
 
   const pickTab = (t: Tab) => { setTab(t); try { localStorage.setItem('pla_tab', t) } catch { /* ignore */ } }
   const toggleSeason = (s: string) => setSeasons((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]))
@@ -126,7 +135,7 @@ export default function AnalyticsPage() {
         <div className="grp"><span className="lbl">Team</span>
           {([['all', 'Home + away'], ['home', 'Home'], ['away', 'Away']] as const).map(([k, l]) =>
             <button key={k} className="pla-chip" aria-pressed={venue === k} onClick={() => setVenue(k)}>{l}</button>)}</div>
-        {tab !== 'moneyline' && <div className="grp"><span className="lbl">View</span>
+        {tab !== 'moneyline' && tab !== 'buckets' && <div className="grp"><span className="lbl">View</span>
           {([['cumulative', 'Cumulative'], ['bucket', 'By bucket']] as const).map(([k, l]) =>
             <button key={k} className="pla-chip" aria-pressed={mode === k} onClick={() => setMode(k)}>{l}</button>)}</div>}
       </div>
@@ -148,6 +157,8 @@ export default function AnalyticsPage() {
             <span>White tick on each bar = break-even</span>
             <span>Units: flat 1u at the posted price (−110 when no price was recorded)</span>
           </div>
+
+          {tab === 'buckets' && <BucketPlays games={teamGames} include={includeTG} />}
 
           {tab === 'shots' && (
             <div className="pla-grid">

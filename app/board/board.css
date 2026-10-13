@@ -77,3 +77,18 @@
 .plb .plb-q.on { background: var(--live); border-color: var(--live); color: #1c1300 }
 .plb .plb-q.undo { background: var(--loss); border-color: var(--loss); color: #fff }
 .plb-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 50; background: var(--ice); color: var(--background); font-weight: 600; font-size: .85rem; padding: 9px 16px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: calc(100vw - 32px) }
+
+/* bets linked to a qualifying shot bucket */
+.plb-q.link { box-shadow: 0 0 0 2px #facc15; }
+.plb-q.link.on { box-shadow: 0 0 0 2px #facc15, inset 0 0 0 1px rgba(255,255,255,.4); }
+.plb-tag.link { background: rgba(250,204,21,.16); color: #fde047; border-color: rgba(250,204,21,.45); }
+.plb-est { color: rgba(224,242,254,.55); font-size: .68rem; font-weight: 600; }
+
+/* view-only board: shot projection in a 57%+ bucket, O/U edges */
+.plb td.plb-hitcell, .plb-swatch.plb-hitcell { background: rgba(34,197,94,.16); box-shadow: inset 0 0 0 2px var(--win); color: #fff; font-weight: 700 }
+.plb-swatch { display: inline-block; padding: 1px 8px; border-radius: 4px; font-family: var(--font-mono), monospace }
+.plb-hitlbl { font-family: var(--font-sans), system-ui, sans-serif; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--win); margin-top: 2px }
+.plb-bktpct { color: var(--plb-muted); font-size: .68rem; margin-left: 4px }
+.plb-edge { color: var(--plb-muted); font-size: .75rem }
+.plb-edge.hit { color: var(--win); font-weight: 700; background: rgba(34,197,94,.15); padding: 1px 6px; border-radius: 4px }
+.plb-act { color: var(--plb-muted); font-size: .72rem }

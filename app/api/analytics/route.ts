@@ -9,7 +9,7 @@ import { getUserEmail } from '@/lib/requireUser'
 export const dynamic = 'force-dynamic'
 
 const HISTORY_COLS = 'season,source,game_date,game_key,team,opponent,home_away,shot_line,l10_delta,ha_delta,actual_shots,actual_goals,actual_saves,x_saves,x_goals,ml_odds,ml_ev,ml_won,x_game_total_goals,ou_goals_line,ou_goals_odds,logged_pick_side,logged_pick_result'
-const LIVE_COLS = 'game_date,game_id,team,team_name,home_away,shots_line,shots_over_odds,shots_under_odds,shots_delta_l10,shots_delta_ha,actual_shots,ml_odds,ml_ev_l10,ml_ev_ha,won,game_total,game_total_over_odds,game_total_under_odds,x_game_total_l10,x_game_total_ha,actual_game_goals,saves_line,saves_over_odds,saves_under_odds,x_saves_l10,x_saves_ha,actual_saves'
+const LIVE_COLS = 'game_date,game_id,team,team_name,home_away,shots_line,shots_over_odds,shots_under_odds,shots_delta_l10,shots_delta_ha,shots_delta_ha_excel,shots_delta_l10_excel,actual_shots,team_goals_line,team_goals_over_odds,team_goals_under_odds,actual_goals,ml_odds,ml_ev_l10,ml_ev_ha,won,game_total,game_total_over_odds,game_total_under_odds,x_game_total_l10,x_game_total_ha,actual_game_goals,saves_line,saves_over_odds,saves_under_odds,x_saves_l10,x_saves_ha,actual_saves'
 
 async function fetchAll(path: string): Promise<Record<string, unknown>[]> {
   const url = process.env.HOCKEY_SUPABASE_URL, key = process.env.HOCKEY_SUPABASE_KEY
