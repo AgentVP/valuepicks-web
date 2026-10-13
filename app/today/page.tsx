@@ -182,15 +182,21 @@ export default function TodayPage() {
 
     setGames(gamesList)
 
-    const { data: pickRows } = await supabase
-      .from('picks')
-      .select(`
-        game_id,
-        picked_team,
-        entries (
-          entrant_name
-        )
-      `)
+    // Only this slate's picks. Fetching every pick ever made stopped working once the table passed
+    // 1,000 rows (Supabase returns at most 1,000 per request), which hid the newest picks.
+    const slateGameIds = rawList.map((g) => g.id)
+    const { data: pickRows } = slateGameIds.length
+      ? await supabase
+          .from('picks')
+          .select(`
+            game_id,
+            picked_team,
+            entries (
+              entrant_name
+            )
+          `)
+          .in('game_id', slateGameIds)
+      : { data: [] }
 
     const formatted = (pickRows || []).map((p: { game_id: number; picked_team: string; entries: { entrant_name: string } | { entrant_name: string }[] | null }) => {
       const ent = Array.isArray(p.entries) ? p.entries[0] : p.entries
