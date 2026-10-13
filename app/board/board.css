@@ -92,3 +92,9 @@
 .plb-edge { color: var(--plb-muted); font-size: .75rem }
 .plb-edge.hit { color: var(--win); font-weight: 700; background: rgba(34,197,94,.15); padding: 1px 6px; border-radius: 4px }
 .plb-act { color: var(--plb-muted); font-size: .72rem }
+
+/* Use the full window width: the site's main column is narrow (max-w-4xl) for the pick'em pages.
+   The board breaks out of it, centered, up to 1600px; on small screens it stays inside the page with side scroll. */
+.plb { width: min(calc(100vw - 48px), 1600px); max-width: none; position: relative; left: 50%; transform: translateX(-50%) }
+.plb td { padding: 7px 8px }
+.plb th { padding: 7px 8px 4px }
