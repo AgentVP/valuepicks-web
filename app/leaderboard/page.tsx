@@ -206,6 +206,34 @@ export default function LeaderboardPage() {
 
   const isToday = contestToday != null && slateDate === contestToday
 
+  /** Eastern-time clock: is this slate past 10pm ET (or an earlier day)? */
+  const etNow = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' })
+      .formatToParts(new Date())
+    const get = (t: string) => parts.find((x) => x.type === t)?.value ?? ''
+    return { date: `${get('year')}-${get('month')}-${get('day')}`, hour: Number(get('hour')) }
+  }
+  /**
+   * Fun badges (display only; scoring is unchanged):
+   * - allFavorites: every pick was the favorite at the price entered (odds shorter than even money).
+   * - hit: picked every game and won them all, every game final -> PARLAY HIT.
+   * - watch: picked every game, no losses yet, at least one win, after 10pm ET -> PARLAY WATCH (ends with the first loss).
+   */
+  function badges(entry: Entry) {
+    const picked = games.filter((g) => pickForGame(entry, g))
+    const pickedAll = games.length > 0 && picked.length === games.length
+    const results = entry.picks.map(computedResult)
+    const wins = results.filter((r) => r === true).length
+    const losses = results.filter((r) => r === false).length
+    const withOdds = entry.picks.filter((p) => p.decimal_odds != null && p.decimal_odds > 0)
+    const allFavorites = entry.picks.length > 0 && withOdds.length === entry.picks.length && withOdds.every((p) => (p.decimal_odds as number) < 2)
+    const hit = pickedAll && losses === 0 && wins === games.length
+    const now = etNow()
+    const late = slateDate != null && (slateDate < now.date || (slateDate === now.date && now.hour >= 22))
+    const watch = !hit && pickedAll && losses === 0 && wins > 0 && late
+    return { allFavorites, hit, watch }
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold text-white mb-2">Leaderboard</h1>
@@ -256,12 +284,23 @@ export default function LeaderboardPage() {
       )}
 
       <div className="space-y-5">
-        {entries.map((entry, rank) => (
+        {entries.map((entry, rank) => { const bd = badges(entry); return (
           <div
             key={entry.entrant_name}
-            className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 card-hover"
+            className={`relative overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-4 card-hover${bd.hit ? ' vp-hit' : bd.allFavorites ? ' vp-rainbow' : ''}${bd.watch ? ' vp-watch' : ''}`}
+            title={bd.allFavorites ? 'Picked every favorite' : undefined}
           >
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            {bd.hit && (
+              <div className="vp-fireworks" aria-hidden="true">
+                {['🎆', '💵', '🎇', '💲', '🎆', '💰', '🎇', '💵', '💲', '🎆', '💰', '🎇'].map((e, i) => <span key={i} style={{ ['--i' as string]: i, left: `${4 + i * 8}%`, top: `${10 + ((i * 37) % 70)}%` }}>{e}</span>)}
+              </div>
+            )}
+            {(bd.hit || bd.watch) && (
+              <div className={`relative z-[1] mb-3 flex items-center justify-center gap-2 rounded-lg py-1.5 font-black tracking-[0.2em] text-sm ${bd.hit ? 'vp-hit-banner' : 'vp-watch-banner'}`}>
+                {bd.hit ? <>💰 PARLAY HIT 💰</> : <><span className="vp-watch-eyes">👀</span> PARLAY WATCH <span className="vp-watch-eyes">🚨</span></>}
+              </div>
+            )}
+            <div className="relative z-[1] flex flex-wrap items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-3">
                 <span
                   className={`flex items-center justify-center w-8 h-8 rounded-lg font-bold text-sm ${
@@ -296,7 +335,7 @@ export default function LeaderboardPage() {
                 </span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="relative z-[1] flex flex-wrap gap-1.5">
               {games.map((game) => {
                 const pick = pickForGame(entry, game)
                 if (!pick) {
@@ -336,7 +375,7 @@ export default function LeaderboardPage() {
               })}
             </div>
           </div>
-        ))}
+        ) })}
       </div>
     </div>
   )
