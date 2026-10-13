@@ -53,6 +53,12 @@ export default function Navbar() {
           >
             History
           </Link>
+          <Link
+            href="/board"
+            className={`${base} ${pathname === '/board' ? active : inactive}`}
+          >
+            Board
+          </Link>
           <a
             href="https://valuepicks.pro/analytics"
             target="_blank"

@@ -1,0 +1,54 @@
+/* Puck Line Board — scoped with the plb- prefix; uses the analytics app's color tokens */
+.plb { --plb-under: #60a5fa; --plb-under-bg: rgba(96,165,250,.14); --plb-over: #fbbf24; --plb-over-bg: rgba(251,191,36,.14);
+  --plb-muted: rgba(224,242,254,.6); --plb-line: var(--card-border); display: grid; gap: 18px; font-variant-numeric: tabular-nums; }
+.plb-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 20px; }
+.plb-head h1 { font-size: 1.6rem; font-weight: 800; color: #fff; margin: 0; letter-spacing: -.01em }
+.plb-sub { color: var(--plb-muted); font-size: .85rem; margin-top: 2px }
+.plb-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.plb-controls label { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--plb-muted); display: flex; gap: 6px; align-items: center }
+.plb input, .plb button { font: inherit; color: var(--foreground); background: var(--card); border: 1px solid var(--plb-line); border-radius: 8px; padding: 6px 9px }
+.plb input[type=number] { width: 4.4em }
+.plb button { cursor: pointer; font-weight: 600 }
+.plb button:hover { border-color: var(--accent) }
+.plb button.plb-primary { background: var(--accent); color: var(--background); border-color: var(--accent) }
+.plb-seg { display: inline-flex; border: 1px solid var(--plb-line); border-radius: 8px; overflow: hidden }
+.plb-seg button { border: 0; border-radius: 0 }
+.plb-seg button[aria-pressed="true"] { background: var(--ice); color: var(--background) }
+.plb-chips { display: flex; flex-wrap: wrap; gap: 8px }
+.plb-chip { background: var(--card); border: 1px solid var(--plb-line); border-radius: 10px; padding: 8px 12px; min-width: 120px; display: grid; gap: 2px }
+.plb-chip b { font-size: 1.35rem; color: #fff; line-height: 1.1 }
+.plb-chip small { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--plb-muted) }
+.plb-note { border: 1px solid var(--plb-line); border-left: 4px solid var(--accent); background: var(--card); padding: 10px 14px; border-radius: 8px }
+.plb-note.err { border-left-color: var(--loss) }
+.plb-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--plb-muted); font-size: .8rem; align-items: center }
+.plb-game { background: var(--card); border: 1px solid var(--plb-line); border-radius: 12px; overflow: hidden }
+.plb-game.play { border-color: var(--accent) }
+.plb-ghead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; padding: 10px 14px; border-bottom: 1px solid var(--plb-line); align-items: baseline }
+.plb-ghead h2 { font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0 }
+.plb-meta { color: var(--plb-muted); font-size: .8rem; display: flex; gap: 10px; flex-wrap: wrap; align-items: center }
+.plb-scroll { overflow-x: auto }
+.plb table { border-collapse: collapse; width: 100% }
+.plb th { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; color: var(--plb-muted); font-weight: 600; text-align: right; padding: 7px 10px 4px; white-space: nowrap; border-bottom: 1px solid var(--plb-line) }
+.plb th.grp { text-align: center; border-bottom: 0; color: var(--ice) }
+.plb th:first-child, .plb td:first-child { text-align: left }
+.plb td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--plb-line); font-family: var(--font-mono), ui-monospace, monospace; font-size: .8rem }
+.plb tr:last-child td { border-bottom: 0 }
+.plb td.team { font-family: var(--font-sans), system-ui, sans-serif; font-weight: 600; font-size: .88rem; color: #fff }
+.plb td.team small { color: var(--plb-muted); font-weight: 400; margin-left: 4px }
+.plb .sep { border-left: 1px solid var(--plb-line) }
+.plb-na { color: var(--plb-muted) }
+.plb-move { font-size: .72rem; color: var(--plb-muted) }
+.plb-pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-weight: 600; min-width: 3.4em; text-align: center }
+.plb-pill.under { color: var(--plb-under); background: var(--plb-under-bg) }
+.plb-pill.over { color: var(--plb-over); background: var(--plb-over-bg) }
+.plb-pill.hit { outline: 2px solid currentColor; outline-offset: -2px }
+.plb-ev.pos { color: var(--win); font-weight: 600 }
+.plb-ev.neg { color: var(--plb-muted) }
+.plb-ev.hit { background: rgba(34,197,94,.15); padding: 1px 6px; border-radius: 4px }
+.plb-w { color: var(--win); font-weight: 700 } .plb-l { color: var(--loss); font-weight: 700 }
+.plb-tag { font-family: var(--font-sans), system-ui, sans-serif; font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 4px; background: rgba(224,242,254,.08); color: var(--plb-muted) }
+.plb-tag.b2b { background: rgba(239,68,68,.15); color: var(--loss) }
+.plb-foot { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 9px 14px; background: rgba(15,23,42,.45); font-size: .82rem; align-items: center }
+.plb-lbl { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; color: var(--plb-muted); margin-right: 4px }
+.plb-ledger h3 { font-size: 1.1rem; font-weight: 700; color: #fff; margin: 0 0 6px }
+.plb-card { background: var(--card); border: 1px solid var(--plb-line); border-radius: 12px }
