@@ -9,6 +9,7 @@ import {
 } from '@/lib/analytics'
 import { teamGamesFromHistory, teamGamesFromLive, type TeamGame } from '@/lib/linkedBets'
 import BucketPlays from './bucketPlays'
+import StarterSaves, { type SaveRow } from './starterSaves'
 import './analytics.css'
 
 type Tab = 'buckets' | 'shots' | 'moneyline' | 'totals' | 'saves'
@@ -62,6 +63,7 @@ export default function AnalyticsPage() {
   const [saveLine, setSaveLine] = useState<'real' | 'standin'>('real')
   const [priceEv, setPriceEv] = useState<number | null>(0)
   const [teamGames, setTeamGames] = useState<TeamGame[]>([])
+  const [starterRows, setStarterRows] = useState<SaveRow[]>([])
 
   useEffect(() => {
     try { const t = localStorage.getItem('pla_tab'); if (t && TABS.some((x) => x.key === t)) setTab(t as Tab) } catch { /* ignore */ }
@@ -78,6 +80,7 @@ export default function AnalyticsPage() {
         const all = [...fillHistoryTotals(fromHistory(json.history || []), json.history || []), ...fromLive(json.live || [])]
         setGames(all)
         setTeamGames([...teamGamesFromHistory(json.history || []), ...teamGamesFromLive(json.live || [])])
+        setStarterRows((json.saves || []).map((r: Record<string, unknown>) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, ['game_date', 'team', 'goalie', 'result'].includes(k) ? v : v === null ? null : Number(v)]))) as SaveRow[])
         setSeasons([...new Set(all.map((g) => g.season))].sort())
       } catch { setError('Could not load analytics. Check your connection and reload.') }
       finally { setLoading(false) }
@@ -224,10 +227,12 @@ export default function AnalyticsPage() {
 
           {tab === 'saves' && (
             <>
+              <StarterSaves rows={starterRows} />
+              <h2 style={{ color: '#fff', fontSize: '1.05rem', fontWeight: 700, margin: '8px 0 0' }}>Older saves model (team-level, before starters were tracked)</h2>
               <div className="pla-filters">
                 <div className="grp"><span className="lbl">Grade against</span>
                   <button className="pla-chip" aria-pressed={saveLine === 'real'} onClick={() => setSaveLine('real')}>Real saves lines</button>
-                  <button className="pla-chip" aria-pressed={saveLine === 'standin'} onClick={() => setSaveLine('standin')}>Stand-in line (opp. shot line × 0.90)</button>
+                  <button className="pla-chip" aria-pressed={saveLine === 'standin'} onClick={() => setSaveLine('standin')}>Stand-in line (opp. shot line × 0.874)</button>
                 </div>
               </div>
               <div className="pla-stats">

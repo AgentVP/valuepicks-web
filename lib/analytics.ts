@@ -169,7 +169,7 @@ export function fromHistory(rows: Raw[]): Game[] {
       ml: { odds: num(r.ml_odds), won: bool(r.ml_won), ev: { l10: null, ha: num(r.ml_ev) } },
       total: { line: num(r.ou_goals_line), actual: null, over: num(r.ou_goals_odds), under: num(r.ou_goals_odds), x: { l10: null, ha: xTotal } },
       saves: { line: null, actual: num(r.actual_saves), over: null, under: null, x: { l10: null, ha: num(r.x_saves) },
-               standIn: oppLine === null ? null : Math.floor(oppLine * 0.9) + 0.5 },
+               standIn: oppLine === null ? null : Math.floor(oppLine * 0.874) + 0.5 },
       loggedSide: r.logged_pick_side === 'over' || r.logged_pick_side === 'under' ? (r.logged_pick_side as 'over' | 'under') : null,
       loggedResult: r.logged_pick_result === 'win' || r.logged_pick_result === 'loss' ? (r.logged_pick_result as 'win' | 'loss') : null,
     }
@@ -193,7 +193,7 @@ export function fromLive(rows: Raw[]): Game[] {
       total: { line: num(r.game_total), actual: num(r.actual_game_goals), over: num(r.game_total_over_odds), under: num(r.game_total_under_odds),
                x: { l10: num(r.x_game_total_l10), ha: num(r.x_game_total_ha) } },
       saves: { line: num(r.saves_line), actual: num(r.actual_saves), over: num(r.saves_over_odds), under: num(r.saves_under_odds),
-               x: { l10: num(r.x_saves_l10), ha: num(r.x_saves_ha) }, standIn: oppLine === null ? null : Math.floor(oppLine * 0.9) + 0.5 },
+               x: { l10: num(r.x_saves_l10), ha: num(r.x_saves_ha) }, standIn: oppLine === null ? null : Math.floor(oppLine * 0.874) + 0.5 },
       loggedSide: null, loggedResult: null,
     }
   })

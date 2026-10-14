@@ -98,3 +98,5 @@
 .plb { width: min(calc(100vw - 48px), 1600px); max-width: none; position: relative; left: 50%; transform: translateX(-50%) }
 .plb td { padding: 7px 8px }
 .plb th { padding: 7px 8px 4px }
+
+.plb-goalie { font-family: var(--font-sans), system-ui, sans-serif; font-size: .7rem; color: var(--plb-muted); white-space: nowrap }

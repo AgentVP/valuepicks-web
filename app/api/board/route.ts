@@ -74,12 +74,13 @@ export async function GET(request: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'Bad date' }, { status: 400 })
 
   try {
-    const [slate, starts, moves, history, past] = await Promise.all([
+    const [slate, starts, moves, history, past, goalies] = await Promise.all([
       hockey(`model_vs_lines?select=${SLATE_COLS}&game_date=eq.${date}`),
       hockey(`daily_projections?select=game_id,team,start_time_utc&game_date=eq.${date}`),
       hockey(`line_movement?select=${MOVE_COLS}&game_date=eq.${date}`),
       hockey(`model_vs_lines?select=${HIST_COLS}&actual_shots=not.is.null&order=game_date`),
       hockeyAll('team_games?select=game_date,game_key,team,l10_delta,ha_delta,shot_line,actual_shots&actual_shots=not.is.null&shot_line=not.is.null'),
+      hockey(`saves_graded?select=game_id,team,goalie,goalie_sv,saves_line,saves_over_odds,saves_under_odds,implied_sv,x_saves_ha,x_saves_l10,edge_ha,edge_l10,snapshot,actual_saves,result&game_date=eq.${date}`),
     ])
     // Bucket win rates: every graded game before this date. History was graded on the workbook's original shot formula,
     // so live games are bucketed on the same original-formula deltas (*_excel) to compare like with like.
@@ -91,8 +92,11 @@ export async function GET(request: Request) {
     const key = (r: { game_id: number; team: string }) => `${r.game_id}|${r.team}`
     const startMap = new Map(starts.map((r: { game_id: number; team: string; start_time_utc: string }) => [key(r), r.start_time_utc]))
     const moveMap = new Map(moves.map((r: { game_id: number; team: string }) => [key(r), r]))
+    // Starter saves projections (made ~30 min before puck drop), prefixed sp_ so they never collide with slate columns
+    const spMap = new Map((goalies as Record<string, unknown>[]).map((g) => [`${g.game_id}|${g.team}`,
+      Object.fromEntries(Object.entries(g).filter(([k]) => k !== 'game_id' && k !== 'team').map(([k, v]) => [`sp_${k}`, v]))]))
     const rows = slate
-      .map((r: { game_id: number; team: string }) => ({ ...r, ...(moveMap.get(key(r)) || {}), start_time_utc: startMap.get(key(r)) || null }))
+      .map((r: { game_id: number; team: string }) => ({ ...r, ...(moveMap.get(key(r)) || {}), ...(spMap.get(key(r)) || {}), start_time_utc: startMap.get(key(r)) || null }))
       .sort((a: { start_time_utc: string | null; game_id: number; home_away: string }, b: { start_time_utc: string | null; game_id: number; home_away: string }) =>
         String(a.start_time_utc).localeCompare(String(b.start_time_utc)) || a.game_id - b.game_id || (a.home_away === 'away' ? -1 : 1))
     return NextResponse.json({ rows, history, past, buckets, loadedAt: new Date().toISOString() })

@@ -86,7 +86,7 @@ export default function BucketPlays({ games, include }: { games: TeamGame[]; inc
               </tr>)
           }))}</tbody>
         </table></div>
-        <div className="pla-foot">Every non-zero shot delta, qualifying or not, grouped by whole shots. Cells show W–L and ROI. Saves use the posted line when there is one, otherwise floor(shot line × 0.9) + 0.5 at −110 (an estimate, not a real price).</div>
+        <div className="pla-foot">Every non-zero shot delta, qualifying or not, grouped by whole shots. Cells show W–L and ROI. Saves use the posted line when there is one, otherwise floor(shot line × 0.874) + 0.5 at −110 (an estimate, not a real price).</div>
       </section>
     </>
   )

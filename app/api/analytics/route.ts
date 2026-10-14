@@ -32,11 +32,12 @@ export async function GET(request: Request) {
   const owners = (process.env.ANALYTICS_OWNER_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
   if (owners.length && !owners.includes(email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   try {
-    const [history, live] = await Promise.all([
+    const [history, live, saves] = await Promise.all([
       fetchAll(`team_games?select=${HISTORY_COLS}&order=game_date`),
       fetchAll(`model_vs_lines?select=${LIVE_COLS}&actual_shots=not.is.null&order=game_date`),
+      fetchAll('saves_graded?select=game_date,team,goalie,saves_line,saves_over_odds,saves_under_odds,edge_ha,edge_l10,implied_sv,actual_saves,result&result=not.is.null&order=game_date'),
     ])
-    return NextResponse.json({ history, live, loadedAt: new Date().toISOString() })
+    return NextResponse.json({ history, live, saves, loadedAt: new Date().toISOString() })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'error'
     return NextResponse.json({ error: msg === 'not_configured' ? 'Analytics data source is not configured.' : 'Could not reach the model database.' },

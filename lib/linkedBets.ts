@@ -9,7 +9,7 @@
  *   moneyline    over -> this team's ML; under -> the opponent's ML
  *   team_goals   this team's goals, same side
  *   game_total   the game total, same side
- * Saves use the posted saves line when there is one, otherwise an estimate: floor(shot line x 0.9) + 0.5 at -110.
+ * Saves use the posted saves line when there is one, otherwise an estimate: floor(shot line x 0.874) + 0.5 at -110 (0.874 = league starter saves per team shot against, which is also how Bovada sets saves lines on average).
  */
 import { bandOf, type BucketStats } from './shotBuckets'
 
@@ -45,7 +45,7 @@ export interface TeamGame {
 export interface Tally { w: number; l: number; p: number; u: number; est: number }
 const blank = (): Tally => ({ w: 0, l: 0, p: 0, u: 0, est: 0 })
 export const profit = (o: number) => (o < 0 ? 100 / -o : o / 100)
-export const estSavesLine = (oppShotLine: number | null) => (oppShotLine === null ? null : Math.floor(oppShotLine * 0.9) + 0.5)
+export const estSavesLine = (oppShotLine: number | null) => (oppShotLine === null ? null : Math.floor(oppShotLine * 0.874) + 0.5)
 
 export interface BucketRule { minPct: number; minN: number }   // minPct as a fraction (0.55)
 export const bucketKey = (m: ShotModel, d: number) => `${m}|${d < 0 ? 'under' : 'over'}|${bandOf(d)}`
