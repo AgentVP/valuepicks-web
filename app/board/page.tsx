@@ -89,7 +89,7 @@ export default function PuckLineBoard() {
       <td className={b?.hit ? 'plb-hitcell' : ''}
         title={b ? `${b.label} ${b.side}s bucket: ${b.w}-${b.total - b.w}${b.pct === null ? '' : ` (${(b.pct * 100).toFixed(0)}%)`}` : undefined}>
         {x.toFixed(1)} {d !== null && <span className={`plb-pill ${d < 0 ? 'under' : 'over'}`}>{sgn(d)}</span>}
-        {b && b.total > 0 && <small className="plb-bktpct">{((b.pct ?? 0) * 100).toFixed(0)}%</small>}
+        {b && b.total > 0 && <small className="plb-bktpct" title={`${b.w}-${b.total - b.w} in this bucket`}>{((b.pct ?? 0) * 100).toFixed(0)}% · {b.total}</small>}
         {b?.hit && <div className="plb-hitlbl">{b.side === 'under' ? 'Under' : 'Over'} · {b.total} bets</div>}
       </td>)
   }
@@ -104,7 +104,8 @@ export default function PuckLineBoard() {
    *  OTHER team's shot bucket for the same model is over 57% in the same direction (more shots on him = more saves). */
   const SaveCell = ({ r, opp, model }: { r: Row; opp: Row; model: ShotModel }) => {
     const x = n(r[`sp_x_saves_${model}`]), e = n(r[`sp_edge_${model}`])
-    if (x === null || e === null) return <td className="plb-na">—</td>
+    if (x === null) return <td className="plb-na">—</td>
+    if (e === null) return <td title="Projected saves; the edge appears once a saves line is posted">{x.toFixed(1)}</td>
     const hit = Math.abs(e) >= EDGE.saves, b = bucketOf(model, opp)
     const backed = hit && !!b?.hit && (b.side === 'over') === (e > 0)
     return <td className={backed ? 'plb-hitcell' : ''} title={backed ? `${opp.team_name} ${b!.label} shot bucket (${model === 'ha' ? 'H/A' : 'L10'}) backs this` : undefined}>
@@ -144,7 +145,7 @@ export default function PuckLineBoard() {
         <span><span className="plb-hitcell plb-swatch">28.4</span> that model&apos;s shot bucket has won over 57% (20+ bets)</span>
         <span><span className="plb-ev pos hit">+8%</span> moneyline EV +5% or better</span>
         <span><span className="plb-edge hit">O +0.45</span> goals, total or saves edge past the line (goals 0.3, total 0.5, saves 1.5)</span>
-        <span>Goalie saves post about 30 min before puck drop, once the starter is confirmed. Outlined = the other team&apos;s shot bucket (57%+) agrees</span>
+        <span>Goalie saves: projections show all day; the line and edge appear once the starter&apos;s line posts (checked 30, 15, 10 and 3 min before puck drop). Outlined = the other team&apos;s shot bucket (57%+) agrees</span>
         <span>H/A and L10 are separate models, never blended</span>
       </div>
 
@@ -187,7 +188,7 @@ export default function PuckLineBoard() {
                       <Ev v={r.ml_ev_ha} /><Ev v={r.ml_ev_l10} />
                       <td className="sep">{gl === null ? <span className="plb-na">—</span> : fmt(gl)}{n(r.actual_goals) !== null && <small className="plb-act"> ({String(r.actual_goals)})</small>}</td>
                       <Edge x={r.x_goals_ha} line={gl} min={EDGE.goals} /><Edge x={r.x_goals_l10} line={gl} min={EDGE.goals} />
-                      <td className="sep">{n(r.sp_saves_line) === null ? <span className="plb-na" title="Bovada posts the starter's saves line about 30 minutes before puck drop">at T−30</span> : <>
+                      <td className="sep">{n(r.sp_saves_line) === null ? <span className="plb-na" title="No saves line posted yet. The projections assume a league-average goalie until the starter's line appears.">no line yet</span> : <>
                         <div className="plb-goalie">{String(r.sp_goalie ?? '')}</div>{fmt(r.sp_saves_line)}
                         {n(r.sp_implied_sv) !== null && <small className="plb-act" title="Saves line ÷ other team's shot line. League starters save about 0.874 of their team's shots against."> ·{(n(r.sp_implied_sv) as number).toFixed(3).slice(1)}</small>}
                         {n(r.sp_actual_saves) !== null && <small className="plb-act"> ({String(r.sp_actual_saves)})</small>}</>}</td>
